@@ -1,0 +1,41 @@
+{
+  "name": "serenity-finance",
+  "scripts": {
+    "node:local": "npx hardhat node",
+    "test": "npx hardhat test",
+    "tokens:local": "npx hardhat run scripts/0_deploy_mock_tokens.js --network localhost",
+    "oracle:local": "npx hardhat run scripts/1_deploy_oracle.js --network localhost",
+    "swapper:local": "npx hardhat run scripts/2_deploy_swapper.js --network localhost",
+    "entrypoint:local": "npx hardhat run scripts/3_deploy_entrypoint.js --network localhost",
+    "pools:local": "npx hardhat run scripts/4_deploy_pools.js --network localhost",
+    "rewards:local": "npx hardhat run scripts/5_deploy_rewards_manager.js --network localhost",
+    "full:local": "yarn tokens:local && yarn oracle:local && yarn swapper:local && yarn entrypoint:local && yarn pools:local && yarn rewards:local"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.3",
+    "@nomiclabs/hardhat-etherscan": "^2.1.8",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@openzeppelin/contracts": "^4.4.1",
+    "@openzeppelin/contracts-upgradeable": "^4.4.1",
+    "@openzeppelin/hardhat-upgrades": "^1.12.1",
+    "@uniswap/lib": "^4.0.1-alpha",
+    "chai": "^4.3.4",
+    "dotenv": "^10.0.0",
+    "eslint": "^7.32.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-config-standard": "^16.0.3",
+    "eslint-plugin-import": "^2.25.4",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^3.4.1",
+    "eslint-plugin-promise": "^5.2.0",
+    "ethereum-waffle": "^3.4.0",
+    "ethers": "^5.5.2",
+    "hardhat": "^2.8.4",
+    "hardhat-gas-reporter": "^1.0.7",
+    "prettier": "^2.5.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.13",
+    "solhint": "^3.3.6",
+    "solidity-coverage": "^0.7.17"
+  },
+  "dependencies": {}
+}
