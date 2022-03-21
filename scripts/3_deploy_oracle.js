@@ -1,23 +1,19 @@
 const { ethers } = require('hardhat');
-const {constants } = require('ethers')
+const { constants } = require('ethers')
 const fs = require('fs')
 
 require('dotenv').config()
 const env = process.env;
 
 async function main() {
+    console.log("DEPLOYING ORACLE")
     if (!env.WNATIVE || !env.LINK) {
         throw Error('No WNATIVE or LINK address set in .env baby')
     }
-    // const DexPriceOracle = await ethers.getContractFactory("DexPriceOracle");
-    // const dexOracle = await DexPriceOracle.deploy();
-    // await dexOracle.deployed();
-    // console.log(`DexPriceOracle deployed to ${dexOracle.address}`);
-    // await dexOracle.functions.setUniswapForkSourceForAsset(env.WNATIVE, env.UNISWAP_FACTORY);
-    // PriceOracle
     const PriceOracle = await ethers.getContractFactory("PriceOracle");
-    const oracle = await PriceOracle.deploy(constants.AddressZero, env.WNATIVE);
+    const oracle = await PriceOracle.deploy(env.WNATIVE);
     await oracle.deployed();
+
     console.log("PriceOracle deployed to:", oracle.address);
     fs.appendFileSync('.env', `ORACLE=${oracle.address}\n`);
     await oracle.functions.setAssetSource(env.WNATIVE, env.CHAINLINK_WNATIVE_AGGREGATOR, true);

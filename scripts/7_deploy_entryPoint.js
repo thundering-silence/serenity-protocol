@@ -5,13 +5,14 @@ require('dotenv').config()
 const env = process.env;
 
 async function main() {
-    if (!env.ORACLE || !env.SWAPPER) {
-        throw Error('No Oracle or Swapper address set in .env baby')
+    console.log("DEPLOYING ENTRYPOINT")
+    if (!env.ORACLE || !env.SOUL) {
+        throw Error('No ORACLE or SOUL address set in .env!')
     }
-    const oracle = env.ORACLE;
     const EntryPointStorage = await ethers.getContractFactory("EntryPointStorage");
-    const entryPointStorage = await EntryPointStorage.deploy(oracle);
+    const entryPointStorage = await EntryPointStorage.deploy(env.SOUL, env.ORACLE);
     await entryPointStorage.deployed();
+
     console.log(`EntryPointStorage deployed to ${entryPointStorage.address}`);
     fs.appendFileSync('.env', `ENTRYPOINT_STORAGE=${entryPointStorage.address}\n`);
 
