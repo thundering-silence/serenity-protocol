@@ -140,36 +140,6 @@ contract RewardsManager is Ownable {
     }
 
     // ---------ADMIN METHODS
-    /**
-     * @notice Activate reward
-     * @dev Requires allowance to be set by rewardHolder.
-     * Remember to update pool configs as well.
-     * @param reward - the reward to start distributing
-     * @param rewardHolder_ - the address holding the reward balance (can be this contract)
-     */
-    function activateReward(IERC20 reward, address rewardHolder_)
-        public
-        onlyOwner
-    {
-        _activeRewards.add(address(reward));
-        _rewardHolders[reward] = rewardHolder_;
-        uint256 allowance = reward.allowance(rewardHolder_, address(this));
-        require(
-            allowance == (2 ^ 256) - 1,
-            "ACTIVATE REWARD: Allowance too small"
-        );
-        emit RewardActivated(address(reward), rewardHolder_);
-    }
-
-    /**
-     * @notice Deactivate reward
-     * Users will still be able to claim
-     * @param reward - the reward to deactivate
-     */
-    function deactivateReward(address reward) public onlyOwner {
-        _activeRewards.remove(reward);
-        emit RewardDeactivated(reward);
-    }
 
     /**
      * @notice Remember to notify users in advance and
@@ -195,5 +165,39 @@ contract RewardsManager is Ownable {
             supplyRate,
             borrowRate
         );
+    }
+
+    /**
+     * @notice Activate reward
+     * @dev Requires allowance to be set by rewardHolder.
+     * Remember to update pool configs as well.
+     * @param reward - the reward to start distributing
+     * @param rewardHolder_ - the address holding the reward balance (can be this contract)
+     */
+    function activateReward(IERC20 reward, address rewardHolder_)
+        public
+        onlyOwner
+    {
+        _activeRewards.add(address(reward));
+        _rewardHolders[reward] = rewardHolder_;
+        uint256 allowance = reward.allowance(rewardHolder_, address(this));
+        require(
+            allowance ==
+                uint256(
+                    0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+                ),
+            "ACTIVATE REWARD: Allowance too small"
+        );
+        emit RewardActivated(address(reward), rewardHolder_);
+    }
+
+    /**
+     * @notice Deactivate reward
+     * Users will still be able to claim
+     * @param reward - the reward to deactivate
+     */
+    function deactivateReward(address reward) public onlyOwner {
+        _activeRewards.remove(reward);
+        emit RewardDeactivated(reward);
     }
 }
