@@ -4,12 +4,15 @@
     "node:local": "npx hardhat node",
     "test": "npx hardhat test",
     "tokens:local": "npx hardhat run scripts/0_deploy_mock_tokens.js --network localhost",
-    "oracle:local": "npx hardhat run scripts/1_deploy_oracle.js --network localhost",
-    "swapper:local": "npx hardhat run scripts/2_deploy_swapper.js --network localhost",
-    "entrypoint:local": "npx hardhat run scripts/3_deploy_entrypoint.js --network localhost",
-    "pools:local": "npx hardhat run scripts/4_deploy_pools.js --network localhost",
-    "rewards:local": "npx hardhat run scripts/5_deploy_rewards_manager.js --network localhost",
-    "full:local": "yarn tokens:local && yarn oracle:local && yarn swapper:local && yarn entrypoint:local && yarn pools:local && yarn rewards:local"
+    "zengarden:local": "npx hardhat run scripts/1_deploy_zenGarden.js --network localhost",
+    "spa:local": "npx hardhat run scripts/2_deploy_spa.js --network localhost",
+    "oracle:local": "npx hardhat run scripts/3_deploy_oracle.js --network localhost",
+    "swapper:local": "npx hardhat run scripts/4_deploy_swapper.js --network localhost",
+    "collector:local": "npx hardhat run scripts/5_deploy_feesCollector.js --network localhost",
+    "rewards:local": "npx hardhat run scripts/6_deploy_rewardsManager.js --network localhost",
+    "entryPoint:local": "npx hardhat run scripts/7_deploy_entryPoint.js --network localhost",
+    "pools:local": "npx hardhat run scripts/8_deploy_pools.js --network localhost",
+    "full:local": "yarn tokens:local && yarn zengarden:local && yarn spa:local && yarn oracle:local && yarn swapper:local && yarn collector:local && yarn rewards:local && yarn entryPoint:local && yarn pools:local"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.3",
