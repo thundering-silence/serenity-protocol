@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../feesCollector/interfaces/IFeesCollector.sol";
 import "./interfaces/IPoolStorage.sol";
 import "../libraries/DataTypesLib.sol";
-import "../membership/interfaces/ISpa.sol";
+import "../membership/interfaces/IThermae.sol";
 import "../oracle/interfaces/IPriceOracle.sol";
 import "../rewards/interfaces/IRewardsManager.sol";
 
@@ -20,7 +20,7 @@ abstract contract PoolStorage is AccessControl {
     IERC20 public immutable _underlying;
     IPriceOracle internal _oracle;
     IFeesCollector internal _feesCollector;
-    ISpa internal _spa;
+    IThermae internal _thermae;
     IRewardsManager internal _rewardsManager;
 
     DataTypes.LendingConfig internal _lendingConfig;
@@ -77,7 +77,7 @@ abstract contract PoolStorage is AccessControl {
         _underlying = IERC20(underlying_);
         _oracle = IPriceOracle(oracle_);
         _feesCollector = IFeesCollector(feesCollector_);
-        _spa = ISpa(spa_);
+        _thermae = IThermae(spa_);
 
         _lendingConfig = lendingConfig_;
         _rateConfig = interestRateConfig_;
@@ -98,7 +98,7 @@ abstract contract PoolStorage is AccessControl {
     }
 
     function spa() public view returns (address) {
-        return address(_spa);
+        return address(_thermae);
     }
 
     function feesCollector() public view returns (address) {
