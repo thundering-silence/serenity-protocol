@@ -21,8 +21,12 @@ interface IRewardsManager is IOwnable {
         view
         returns (uint256, uint256);
 
-    function updateAccountRewards(address account, address poolAddress)
-        external;
+    function calculateNewRewardPerShareForPool(IPool pool, IERC20 reward)
+        external
+        view
+        returns (uint256, uint256);
+
+    function updatePoolRewardsData(address poolAddress) external;
 
     function claimForPools(IERC20 reward, IPool[] memory pools) external;
 

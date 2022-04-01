@@ -26,11 +26,19 @@ contract RewardsManager is Ownable {
     }
     mapping(IPool => PoolRewardsConfig) internal _poolRewardsConfig;
 
-    struct AccountData {
-        uint256 lastUpdate;
-        mapping(IERC20 => uint256) accruedRewards;
+    struct PoolRewardsData {
+        mapping(IERC20 => uint256) lastUpdate;
+        mapping(IERC20 => uint256) supplyRewardPerShare;
+        mapping(IERC20 => uint256) borrowRewardPerShare;
     }
-    mapping(address => AccountData) internal _accountsData;
+    mapping(IPool => PoolRewardsData) internal _poolRewardsData;
+
+    struct AccountData {
+        mapping(IERC20 => uint256) supplyRewardPerShare;
+        mapping(IERC20 => uint256) borrowRewardPerShare;
+    }
+
+    mapping(address => mapping(IPool => AccountData)) internal _accountsData;
 
     event Claim(address indexed account, uint256 amount);
     event RewardActivated(address indexed reward, address indexed holder);
@@ -65,7 +73,7 @@ contract RewardsManager is Ownable {
     }
 
     /**
-     * @notice Easy way of getting the reward configuration for a pool
+     * @notice Read the reward configuration for a pool
      * @param pool - the pool of which to read the config
      * @param reward - the reward of which to read the config
      */
@@ -81,69 +89,153 @@ contract RewardsManager is Ownable {
     }
 
     /**
-     * @notice Update the accrued rewards for and account from a pool
-     * @dev Normally called by the pool directly upon deposit/borrow/repay/withdraw
-     * @param account - the account for which to update rewards
-     * @param poolAddress - the pool from which the rewards come from
+     * @notice Read the rewards data for a pool
+     * @param pool - the pool of which to read the data
+     * @param reward - the reward of which to read the data
      */
-    function updateAccountRewards(address account, address poolAddress) public {
+    function poolRewardData(IPool pool, IERC20 reward)
+        public
+        view
+        returns (
+            uint256,
+            uint256,
+            uint256
+        )
+    {
+        PoolRewardsData storage poolData = _poolRewardsData[pool];
+        return (
+            poolData.supplyRewardPerShare[reward],
+            poolData.borrowRewardPerShare[reward],
+            poolData.lastUpdate[reward]
+        );
+    }
+
+    /**
+     * @notice Read the reward data for a pool for an account
+     * @param account - the account of which to read the data
+     * @param pool - the pool of which to read the data
+     * @param reward - the reward of which to read the data
+     */
+    function accountPoolRewardData(
+        address account,
+        IPool pool,
+        IERC20 reward
+    ) public view returns (uint256, uint256) {
+        AccountData storage accountData = _accountsData[account][pool];
+        return (
+            accountData.supplyRewardPerShare[reward],
+            accountData.borrowRewardPerShare[reward]
+        );
+    }
+
+    /**
+     * @notice Calculate new pool rewards per share data for a specified reward
+     * @param pool - the pool of which to compute the data
+     * @param reward - the reward of which to compute the data
+     */
+    function calculateNewRewardPerShareForPool(IPool pool, IERC20 reward)
+        public
+        view
+        returns (uint256, uint256)
+    {
+        PoolRewardsConfig storage poolConfig = _poolRewardsConfig[pool];
+        PoolRewardsData storage poolData = _poolRewardsData[pool];
+        uint256 timeElapsed = block.timestamp - poolData.lastUpdate[reward];
+
+        uint256 supplyRewardPerSharePerSecond = (poolConfig
+            .supplyRewardPerSecond[reward] * accruedRewardsPrecision()) /
+            pool.totalDeposits();
+
+        uint256 borrowRewardPerSharePerSecond = (poolConfig
+            .borrowRewardPerSecond[reward] * accruedRewardsPrecision()) /
+            pool.totalLoans();
+
+        uint256 newSupplyRewardPerShare = timeElapsed *
+            supplyRewardPerSharePerSecond;
+        uint256 newBorrowRewardPerShare = timeElapsed *
+            borrowRewardPerSharePerSecond;
+
+        return (newSupplyRewardPerShare, newBorrowRewardPerShare);
+    }
+
+    /**
+     * @notice Update the accrued rewards pre share for a pool
+     * @dev Normally called by the pool directly upon deposit/borrow/repay/withdraw or when updating the pool' reward config
+     * @param poolAddress - the pool for which the rewards are accrued
+     */
+    function updatePoolRewardsData(address poolAddress) public {
         IPool pool = IPool(poolAddress);
         PoolRewardsConfig storage poolConfig = _poolRewardsConfig[pool];
-        AccountData storage data = _accountsData[account];
+        PoolRewardsData storage poolData = _poolRewardsData[pool];
 
-        uint256 timePassed = block.timestamp - data.lastUpdate;
-
-        for (uint16 i = 0; i < _activeRewards.length(); i++) {
+        for (uint256 i = 0; i < _activeRewards.length(); i++) {
             IERC20 reward = IERC20(_activeRewards.at(i));
 
-            uint256 totalSupplyRewards = timePassed *
-                poolConfig.supplyRewardPerSecond[reward];
-            uint256 totalBorrowRewards = timePassed *
-                poolConfig.borrowRewardPerSecond[reward];
+            uint256 timeElapsed = block.timestamp - poolData.lastUpdate[reward];
 
-            uint256 accountSupplyWeight = (pool.accountDepositAmount(account) *
-                accruedRewardsPrecision()) / pool.totalDeposits();
-            uint256 accountBorrowWeight = (pool.accountDebtAmount(account) *
-                accruedRewardsPrecision()) / pool.totalLoans();
+            uint256 supplyRewardPerSharePerSecond = (poolConfig
+                .supplyRewardPerSecond[reward] * accruedRewardsPrecision()) /
+                pool.totalDeposits();
 
-            console.log("supply=%s", accountSupplyWeight * totalSupplyRewards);
-            console.log("borrow=%s", accountBorrowWeight * totalBorrowRewards);
+            uint256 borrowRewardPerSharePerSecond = (poolConfig
+                .borrowRewardPerSecond[reward] * accruedRewardsPrecision()) /
+                pool.totalLoans();
 
-            data.accruedRewards[reward] +=
-                accountSupplyWeight *
-                totalSupplyRewards +
-                accountBorrowWeight *
-                totalBorrowRewards;
-            data.lastUpdate = block.timestamp;
+            uint256 newSupplyRewardPerShare = timeElapsed *
+                supplyRewardPerSharePerSecond;
+            uint256 newBorrowRewardPerShare = timeElapsed *
+                borrowRewardPerSharePerSecond;
+
+            poolData.supplyRewardPerShare[reward] = newSupplyRewardPerShare;
+            poolData.borrowRewardPerShare[reward] = newBorrowRewardPerShare;
+
+            poolData.lastUpdate[reward] = block.timestamp;
         }
     }
 
     /**
      * @notice Claim reward
-     * @dev Caller needs to pass which pools to calculate newAccrued rewards for
+     * @dev Caller needs to pass which pools to claim for
      * @param reward - the reward to claim
-     * @param pools - lost of pools for which to update the accrued rewards before claiming - normally all of them
+     * @param pools - list of pools for which to update the accrued rewards before claiming - normally all of them
      */
     function claimForPools(IERC20 reward, address[] memory pools) public {
         address account = _msgSender();
+        uint256 toClaim;
 
         for (uint256 i = 0; i < pools.length; i++) {
-            updateAccountRewards(account, pools[i]);
+            IPool pool = IPool(pools[i]);
+            AccountData storage accountData = _accountsData[account][pool];
+            PoolRewardsData storage poolData = _poolRewardsData[pool];
+
+            uint256 supplyDelta = poolData.supplyRewardPerShare[reward] -
+                accountData.supplyRewardPerShare[reward];
+            uint256 borrowDelta = poolData.borrowRewardPerShare[reward] -
+                accountData.borrowRewardPerShare[reward];
+
+            uint256 toAdd = supplyDelta * pool.accountDepositAmount(account);
+            toAdd += borrowDelta * pool.accountDebtAmount(account);
+
+            toClaim += toAdd / 1 ether;
+
+            accountData.supplyRewardPerShare[reward] = poolData
+                .supplyRewardPerShare[reward];
+            accountData.borrowRewardPerShare[reward] = poolData
+                .borrowRewardPerShare[reward];
         }
 
-        uint256 balance = _accountsData[account].accruedRewards[reward] /
-            accruedRewardsPrecision();
-        _accountsData[account].accruedRewards[reward] = 0;
-        reward.safeTransferFrom(_rewardHolders[reward], account, balance);
+        toClaim = toClaim / accruedRewardsPrecision();
+        console.log("toClaim=%s", toClaim);
 
-        emit Claim(account, balance);
+        reward.safeTransferFrom(_rewardHolders[reward], account, toClaim);
+
+        emit Claim(account, toClaim);
     }
 
     // ---------ADMIN METHODS
 
     /**
-     * @notice Remember to notify users in advance and
-     * allow them enough time to update their accrued rewards balances
+     * @notice Update a pool's reward configuration
      * @param pool - the pool for which to update the config
      * @param reward - the reward for which to update the config
      * @param supplyRate - the new supplyRatePerSecond
@@ -155,6 +247,8 @@ contract RewardsManager is Ownable {
         uint256 supplyRate,
         uint256 borrowRate
     ) public onlyOwner {
+        updatePoolRewardsData(address(pool));
+
         PoolRewardsConfig storage poolConfig = _poolRewardsConfig[pool];
         poolConfig.supplyRewardPerSecond[reward] = supplyRate;
         poolConfig.borrowRewardPerSecond[reward] = borrowRate;

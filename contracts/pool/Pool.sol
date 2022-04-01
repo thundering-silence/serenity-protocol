@@ -68,9 +68,9 @@ contract Pool is PoolStorage {
             one();
     }
 
-    function _updateAccruedRewards(address account) internal {
+    function _updateAccruedRewards() internal {
         if (address(_rewardsManager) != address(0)) {
-            _rewardsManager.updateAccountRewards(account, address(this));
+            _rewardsManager.updatePoolRewardsData(address(this));
         }
     }
 
@@ -83,8 +83,7 @@ contract Pool is PoolStorage {
         uint256 amount,
         address depositor
     ) internal returns (uint256 depositAmount) {
-        // update rewards
-        _updateAccruedRewards(account);
+        _updateAccruedRewards();
 
         // update position
         Snapshot storage position = _deposits[account];
@@ -100,7 +99,7 @@ contract Pool is PoolStorage {
 
         // update total deposits
         _totalDeposits += amount;
-        // transfer
+        // safeTransfer
         _underlying.safeTransferFrom(depositor, address(this), amount);
         // update indexes
         _updateIndexes();
@@ -112,7 +111,7 @@ contract Pool is PoolStorage {
     {
         require(_lendingConfig.allowBorrow, "BORROW: borrowing is disabled");
         require(getCash() >= amount, "No more liquidity to borrow");
-        _updateAccruedRewards(account);
+        _updateAccruedRewards();
         // update position
         Snapshot storage position = _debts[account];
         position.accruedInterest += _calculateAccruedInterest(
@@ -126,7 +125,7 @@ contract Pool is PoolStorage {
 
         // update total loans
         _totalLoans += amount;
-        // transfer
+        // safeTransfer
         _underlying.safeTransfer(account, amount);
         // update indexes
         _updateIndexes();
@@ -138,7 +137,7 @@ contract Pool is PoolStorage {
         address repayer
     ) internal returns (uint256 leftoverDebt, uint256 actualAmount) {
         require(amount > 0, "Amount is 0");
-        _updateAccruedRewards(account);
+        _updateAccruedRewards();
         // update position
         Snapshot storage position = _debts[account];
         uint256 newInterest = _calculateAccruedInterest(
@@ -190,7 +189,7 @@ contract Pool is PoolStorage {
         uint256 amount,
         address recipient
     ) internal returns (uint256 leftoverDeposits, uint256 actualAmount) {
-        _updateAccruedRewards(account);
+        _updateAccruedRewards();
         // update position
         Snapshot storage position = _deposits[account];
         position.accruedInterest += _calculateAccruedInterest(
@@ -220,7 +219,7 @@ contract Pool is PoolStorage {
 
         // update total deposits
         _totalDeposits -= removeFromDeposits;
-        // transfer
+        // safeTransfer
         _underlying.safeTransfer(recipient, actualAmount);
         // update indexes
         _updateIndexes();
@@ -325,7 +324,7 @@ contract Pool is PoolStorage {
         if (isCollateral(account)) {
             uint256 multiplier = _lendingConfig.collateralFactor;
             if (isLiquidating) {
-                multiplier = _spa.calculateLiquidationThreshold(
+                multiplier = _thermae.calculateLiquidationThreshold(
                     account,
                     _lendingConfig.collateralFactor,
                     _lendingConfig.maxLiquidationThreshold
@@ -449,7 +448,7 @@ contract Pool is PoolStorage {
     {
         uint256 baseFee = ((amount * (1 ether + _flashLoanConfig.fee)) /
             1 ether) - amount;
-        return _spa.calculateFee(account, baseFee);
+        return _thermae.calculateFee(account, baseFee);
     }
 
     function flashLoan(
@@ -462,11 +461,8 @@ contract Pool is PoolStorage {
             (uint8, address, uint256, address, address, uint256)
         );
         uint256 fee = flashFee(account, amount);
+        _underlying.safeTransfer(address(receiver), amount);
 
-        require(
-            _underlying.transfer(address(receiver), amount),
-            "FlashLender: Transfer failed"
-        );
         console.log("underlying=%s", address(_underlying));
         require(
             receiver.onFlashLoan(
@@ -478,17 +474,12 @@ contract Pool is PoolStorage {
             ) == keccak256("ERC3156FlashBorrower.onFlashLoan"),
             "FlashLender: Callback failed"
         );
-
-        require(
-            _underlying.transferFrom(
-                address(receiver),
-                address(this),
-                amount + fee
-            ),
-            "FlashLender: Repay failed"
+        _underlying.safeTransferFrom(
+            address(receiver),
+            address(this),
+            amount + fee
         );
-
-        _underlying.transfer(address(_feesCollector), fee);
+        _underlying.safeTransfer(address(_feesCollector), fee);
         _feesCollector.updateAccumulatedAmount(address(this), fee);
 
         return true;
