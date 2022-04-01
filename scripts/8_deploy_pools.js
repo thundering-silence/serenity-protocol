@@ -24,7 +24,7 @@ async function main() {
     }
     const MaxSupplyMintBurnERC20 = await ethers.getContractFactory("MaxSupplyMintBurnERC20")
     const ZenGarden = await ethers.getContractFactory("ZenGarden");
-    const Spa = await ethers.getContractFactory("Spa");
+    const Thermae = await ethers.getContractFactory("Thermae");
     const FeesCollector = await ethers.getContractFactory("FeesCollector")
     const RewardsManager = await ethers.getContractFactory("RewardsManager")
     const Entrypoint = await ethers.getContractFactory("EntryPointStorage");
@@ -32,7 +32,6 @@ async function main() {
 
     const mind = await MaxSupplyMintBurnERC20.attach(env.MIND)
     const zenGarden = await ZenGarden.attach(env.BODY)
-    // const spa = await Spa.attach(env.SOUL)
     const feesCollector = await FeesCollector.attach(env.FEES_COLLECTOR)
     const rewardsManager = await RewardsManager.attach(env.REWARDS_MANAGER)
     const entrypoint = await Entrypoint.attach(env.ENTRYPOINT_STORAGE);
@@ -43,8 +42,8 @@ async function main() {
         [
             `${0.75 * 1e18}`, // collateralFactor
             `${0.1 * 1e18}`, // liquidationFee
-            `${0.2 * 1e18}`, // fee
             `${0.95 * 1e18}`, // maxLiquidationThreshold
+            `${0.25 * 1e18}`, // fee
             true, // allow borrowing
         ],
         [
@@ -70,8 +69,8 @@ async function main() {
         [
             `${0.75 * 1e18}`, // collateralFactor
             `${0.1 * 1e18}`, // liquidationFee
-            `${0.2 * 1e18}`, // fee
             `${0.95 * 1e18}`, // maxLiquidationThreshold
+            `${0.15 * 1e18}`, // fee
             true, // allow borrowing
         ],
         [

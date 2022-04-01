@@ -68,8 +68,8 @@ describe("FeesCollector", function () {
             await zenGarden.functions.enter(`${1e20}`)
         }))
 
-        const Spa = await ethers.getContractFactory("Spa");
-        this.SOUL = await Spa.deploy(this.BODY.address, this.treasury.address, constants.WeiPerEther)
+        const Thermae = await ethers.getContractFactory("Thermae");
+        this.SOUL = await Thermae.deploy(this.BODY.address, this.treasury.address, constants.WeiPerEther)
         await this.SOUL.deployed()
 
         const FeesCollector = await ethers.getContractFactory("FeesCollector");

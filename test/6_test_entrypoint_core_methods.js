@@ -60,8 +60,8 @@ describe("EntryPoint core logic", function () {
             await zenGarden.functions.enter(`${1e20}`)
         }))
 
-        const Spa = await ethers.getContractFactory("Spa");
-        this.SOUL = await Spa.deploy(this.BODY.address, this.treasury.address, constants.WeiPerEther)
+        const Thermae = await ethers.getContractFactory("Thermae");
+        this.SOUL = await Thermae.deploy(this.BODY.address, this.treasury.address, constants.WeiPerEther)
         await this.SOUL.deployed()
 
         const FeesCollector = await ethers.getContractFactory("FeesCollector");
@@ -93,8 +93,8 @@ describe("EntryPoint core logic", function () {
             [
                 `${0.75 * 1e18}`, // collateralFactor
                 `${0.1 * 1e18}`, // liquidationFee
-                `${0.2 * 1e18}`, // fee
                 `${0.95 * 1e18}`, // maxLiquidationThreshold
+                `${0.2 * 1e18}`, // fee
                 true, // allow borrowing
             ],
             [
@@ -149,8 +149,8 @@ describe("EntryPoint core logic", function () {
             [
                 `${0.75 * 1e18}`, // collateralFactor
                 `${0.1 * 1e18}`, // liquidationFee
-                `${0.2 * 1e18}`, // fee
                 `${0.95 * 1e18}`, // maxLiquidationThreshold
+                `${0.2 * 1e18}`, // fee
                 true, // allow borrowing
             ],
             [

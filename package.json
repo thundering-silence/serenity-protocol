@@ -5,7 +5,7 @@
     "test": "npx hardhat test",
     "tokens:local": "npx hardhat run scripts/0_deploy_mock_tokens.js --network localhost",
     "zengarden:local": "npx hardhat run scripts/1_deploy_zenGarden.js --network localhost",
-    "spa:local": "npx hardhat run scripts/2_deploy_spa.js --network localhost",
+    "spa:local": "npx hardhat run scripts/2_deploy_thermae.js --network localhost",
     "oracle:local": "npx hardhat run scripts/3_deploy_oracle.js --network localhost",
     "swapper:local": "npx hardhat run scripts/4_deploy_swapper.js --network localhost",
     "collector:local": "npx hardhat run scripts/5_deploy_feesCollector.js --network localhost",

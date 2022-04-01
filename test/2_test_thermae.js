@@ -21,7 +21,7 @@ const tiersData = [
 ]
 
 
-describe("Spa", function () {
+describe("Thermae", function () {
     before(async function () {
         this.signers = await ethers.getSigners();
         this.user = this.signers[0]
@@ -49,15 +49,15 @@ describe("Spa", function () {
             await zenGarden.functions.enter(`${1e20}`)
         }))
 
-        const Spa = await ethers.getContractFactory("Spa");
-        this.SOUL = await Spa.deploy(this.BODY.address, this.treasury.address, constants.WeiPerEther)
+        const Thermae = await ethers.getContractFactory("Thermae");
+        this.SOUL = await Thermae.deploy(this.BODY.address, this.treasury.address, constants.WeiPerEther)
         await this.SOUL.deployed()
 
         await Promise.all(tiersData.map(async (t, i) => {
             await this.SOUL.functions.updateTierConfig(i, Object.values(t))
         }))
 
-        await this.BODY.functions.updateSpa(this.SOUL.address);
+        await this.BODY.functions.updateThermae(this.SOUL.address);
     })
 
     // it(".updateTierConfig() should set the tier data and emit a TierConfigUpdate event", async function() {
