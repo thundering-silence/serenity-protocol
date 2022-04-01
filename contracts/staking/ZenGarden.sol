@@ -4,6 +4,8 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
@@ -13,15 +15,16 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
  */
 contract ZenGarden is ERC20("Body", "BODY"), Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SafeERC20 for IERC20;
 
     IERC20 internal _mind;
-    address internal _spa;
+    address internal _thermae;
 
     EnumerableSet.AddressSet internal _rewards;
     mapping(address => bool) internal _pausedRewards;
 
     struct AccountData {
-        // keep track of deposited MIND to allow transfering BODY to Spa contract and keep receiving rewards
+        // keep track of deposited MIND to allow safeTransfering BODY to Thermae contract and keep receiving rewards
         uint256 depositedAmount;
         mapping(IERC20 => uint256) lastClaimedRewardPerShare;
     }
@@ -39,7 +42,7 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         uint256 amount
     );
 
-    event SpaUpdate(address spa);
+    event ThermaeUpdate(address spa);
     event RewardActivated(address indexed reward);
     event RewardRemoved(address indexed reward);
     event RewardPaused(address indexed reward);
@@ -97,7 +100,7 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
             );
             accountData.lastClaimedRewardPerShare[reward] = current;
             if (amount > 0) {
-                reward.transfer(account, amount);
+                reward.safeTransfer(account, amount);
                 emit Claim(account, address(reward), amount);
             }
         }
@@ -125,7 +128,7 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
     }
 
     function spa() public view returns (address) {
-        return _spa;
+        return _thermae;
     }
 
     /**
@@ -139,7 +142,7 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         onlyUnpaused(address(reward))
     {
         require(_rewards.contains(address(reward)), "Unsupported Reward");
-        reward.transferFrom(_msgSender(), address(this), amount);
+        reward.safeTransferFrom(_msgSender(), address(this), amount);
         uint256 rewardForOne = (amount * rewardPerSharePrecision()) /
             totalSupply();
 
@@ -157,12 +160,12 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         address account = _msgSender();
         _increaseAmount(account, amount);
         _mint(account, amount);
-        _mind.transferFrom(account, address(this), amount);
+        _mind.safeTransferFrom(account, address(this), amount);
     }
 
     /**
      * @notice Exit Zen Garden
-     * @dev burns BODY & transfers MIND
+     * @dev burns BODY & safeTransfers MIND
      * @param amount - the amount of BODY to burn
      */
     function exit(uint256 amount) public {
@@ -170,7 +173,7 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         require(balanceOf(account) >= amount, "EXIT: Amount too big");
         _decreaseAmount(account, amount);
         _burn(account, amount);
-        _mind.transfer(account, amount);
+        _mind.safeTransfer(account, amount);
     }
 
     /**
@@ -211,7 +214,7 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
     /**
      * @dev Moves `amount` of tokens from `sender` to `recipient`.
      *
-     * This internal function is equivalent to {transfer}, and can be used to
+     * This internal function is equivalent to {safeTransfer}, and can be used to
      * e.g. implement automatic token fees, slashing mechanisms, etc.
      *
      * Emits a {Transfer} event.
@@ -227,8 +230,8 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         address recipient,
         uint256 amount
     ) internal virtual override {
-        // if locking into or releasing from Spa do not update deposited amounts
-        if (recipient != _spa && sender != _spa) {
+        // if locking into or releasing from Thermae do not update deposited amounts
+        if (recipient != _thermae && sender != _thermae) {
             _decreaseAmount(sender, amount);
             _increaseAmount(recipient, amount);
         }
@@ -237,8 +240,8 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
 
     /**
      * @notice Reduce the deposited amount of from and increase deposited amount of to
-     * this function is necessary to allow the treasury to accumulate rewards when users withdraw early from Spa
-     * @dev this function can only be called from Spa on early withdrawal
+     * this function is necessary to allow the treasury to accumulate rewards when users withdraw early from Thermae
+     * @dev this function can only be called from Thermae on early withdrawal
      */
     function transferDepositedAmount(
         address from,
@@ -246,17 +249,17 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         uint256 amount
     ) public {
         require(
-            _msgSender() == _spa,
-            "Only Spa contract can invoke such funtion"
+            _msgSender() == _thermae,
+            "Only Thermae contract can invoke such funtion"
         );
         _decreaseAmount(from, amount);
         _increaseAmount(to, amount);
     }
 
     // ADMIN METHODS
-    function updateSpa(address spa_) public onlyOwner {
-        _spa = spa_;
-        emit SpaUpdate(spa_);
+    function updateThermae(address spa_) public onlyOwner {
+        _thermae = spa_;
+        emit ThermaeUpdate(spa_);
     }
 
     function addReward(address token) public onlyOwner {

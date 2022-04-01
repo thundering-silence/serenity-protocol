@@ -10,7 +10,7 @@ import "../../IOwnable.sol";
 import "../../libraries/DataTypesLib.sol";
 import "../../staking/interfaces/IZenGarden.sol";
 
-interface ISpa is IERC20, IOwnable {
+interface IThermae is IERC20, IOwnable {
     function zenGarden() external view returns (IZenGarden);
 
     function treasury() external view returns (address);

@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "hardhat/console.sol";
@@ -12,12 +13,15 @@ import "../staking/interfaces/IZenGarden.sol";
 import "../libraries/DataTypesLib.sol";
 
 /**
- * @title Spa
- * @notice the Spa is a place where you can rest your BODY and relax.
+ * @title Thermae
+ * @notice the Thermae is a place where you can rest your BODY and relax.
  * SOUL is the receipt token for locking up BODY.
- * SOUL is non transferable
+ * SOUL is non safeTransferable
  */
-contract Spa is ERC20("Soul", "SOUL"), Ownable {
+contract Thermae is ERC20("Soul", "SOUL"), Ownable {
+    using SafeERC20 for IZenGarden;
+
+
     IZenGarden internal _zenGarden;
     address internal _treasury;
     uint256 internal _minLockAmount;
@@ -104,9 +108,9 @@ contract Spa is ERC20("Soul", "SOUL"), Ownable {
     }
 
     /**
-     * @notice Join the Spa
+     * @notice Join the Thermae
      * @param amount - the amount to deposit
-     * @param lockPeriod - te amount of seconds to stay in the Spa
+     * @param lockPeriod - te amount of seconds to stay in the Thermae
      */
     function join(uint256 amount, uint256 lockPeriod) public {
         DataTypes.MemberData storage data = _members[_msgSender()];
@@ -130,15 +134,15 @@ contract Spa is ERC20("Soul", "SOUL"), Ownable {
         data.unlockTime = block.timestamp + lockPeriod;
         data.depositedAmount = amount;
 
-        _zenGarden.transferFrom(_msgSender(), address(this), amount);
+        _zenGarden.safeTransferFrom(_msgSender(), address(this), amount);
         _mint(_msgSender(), amount * _tiers[data.tier].receiptRatio);
 
         emit Join(_msgSender(), data.unlockTime);
     }
 
     /**
-     * @notice Prolong the time to stay in the Spa
-     * @dev msg cender needs to already have joined the Spa
+     * @notice Prolong the time to stay in the Thermae
+     * @dev msg cender needs to already have joined the Thermae
      * @param additionalTime - the amount of time to add to the lockPeriod
      */
     function prolongLock(uint256 additionalTime) public {
@@ -169,8 +173,8 @@ contract Spa is ERC20("Soul", "SOUL"), Ownable {
     }
 
     /**
-     * @notice Deposit additional BODY into Spa
-     * @dev caller must have already joined the Spa
+     * @notice Deposit additional BODY into Thermae
+     * @dev caller must have already joined the Thermae
      * @param amount - the amount to deposit
      */
     function deposit(uint256 amount) public {
@@ -179,14 +183,14 @@ contract Spa is ERC20("Soul", "SOUL"), Ownable {
 
         data.depositedAmount += amount;
 
-        _zenGarden.transferFrom(_msgSender(), address(this), amount);
+        _zenGarden.safeTransferFrom(_msgSender(), address(this), amount);
         _mint(_msgSender(), amount * _tiers[data.tier].receiptRatio);
 
         emit Deposit(_msgSender(), amount);
     }
 
     /**
-     * @notice Withdraw BODY from the Spa
+     * @notice Withdraw BODY from the Thermae
      * @dev Requires the timelock to have expired
      */
     function withdraw() public {
@@ -201,7 +205,7 @@ contract Spa is ERC20("Soul", "SOUL"), Ownable {
             _msgSender(),
             data.depositedAmount * _tiers[data.tier].receiptRatio
         );
-        _zenGarden.transfer(_msgSender(), data.depositedAmount);
+        _zenGarden.safeTransfer(_msgSender(), data.depositedAmount);
 
         emit Withdraw(_msgSender(), data.depositedAmount);
     }
@@ -226,7 +230,7 @@ contract Spa is ERC20("Soul", "SOUL"), Ownable {
     }
 
     /**
-     * @notice Force withdraw funds from Spa
+     * @notice Force withdraw funds from Thermae
      * @dev Requires time lock to NOT have expired yet
      */
     function forceWithdraw() public {
@@ -243,13 +247,13 @@ contract Spa is ERC20("Soul", "SOUL"), Ownable {
             block.timestamp
         );
         _burn(_msgSender(), data.depositedAmount * tier.receiptRatio);
-        _zenGarden.transfer(_msgSender(), data.depositedAmount - penalty);
+        _zenGarden.safeTransfer(_msgSender(), data.depositedAmount - penalty);
 
         data.depositedAmount = 0;
         data.unlockTime = 0;
 
         _zenGarden.transferDepositedAmount(_msgSender(), _treasury, penalty);
-        _zenGarden.transfer(_treasury, penalty);
+        _zenGarden.safeTransfer(_treasury, penalty);
     }
 
     /**

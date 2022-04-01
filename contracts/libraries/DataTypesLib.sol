@@ -67,7 +67,7 @@ library DataTypes {
         uint256 accumulatedAmount;
     }
 
-    /**@title Spa */
+    /**@title Thermae */
     enum Tier {
         Calm,
         Peaceful,

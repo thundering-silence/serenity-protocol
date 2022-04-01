@@ -23,15 +23,15 @@ interface IZenGarden is IERC20, IOwnable {
 
     function multiClaim(address[] memory rewardAddresses) external;
 
+    function depositedAmount(address account) external view returns (uint256);
+
     function transferDepositedAmount(
         address from,
         address to,
         uint256 amount
     ) external;
 
-    function depositedAmount(address account) external view returns (uint256);
-
-    function updateSpa(address spa) external;
+    function updateThermae(address spa) external;
 
     function pauseReward(address reward) external;
 

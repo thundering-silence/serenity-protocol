@@ -14,7 +14,7 @@ import "../pool/Pool.sol";
 contract EntryPointStorage is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    ISpa internal _spa;
+    IThermae internal _thermae;
     IPriceOracle internal _oracle;
 
     EnumerableSet.AddressSet internal _supportedAssets;
@@ -28,7 +28,7 @@ contract EntryPointStorage is Ownable {
     event PoolForUnderlying(address indexed underlying, address indexed pool);
 
     constructor(address spa_, address oracle_) {
-        _spa = ISpa(spa_);
+        _thermae = IThermae(spa_);
         _oracle = IPriceOracle(oracle_);
     }
 
@@ -153,7 +153,7 @@ contract EntryPointStorage is Ownable {
             underlying,
             address(_oracle),
             feesCollector,
-            address(_spa),
+            address(_thermae),
             owner(),
             lendingConfig,
             rateConfig,
