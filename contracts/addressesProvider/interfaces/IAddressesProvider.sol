@@ -27,7 +27,7 @@ interface IAddressesProvider is IOwnable {
 
     function updateZenGarden(address value) external;
 
-    function updateSpa(address value) external;
+    function updateThermae(address value) external;
 
     function updateOracle(address value) external;
 

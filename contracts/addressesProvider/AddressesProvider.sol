@@ -63,7 +63,7 @@ contract AddressesProvider is Ownable {
         emit Update("ZEN_GARDEN", value);
     }
 
-    function updateSpa(address value) public onlyOwner {
+    function updateThermae(address value) public onlyOwner {
         SPA = value;
         emit Update("SPA", value);
     }
