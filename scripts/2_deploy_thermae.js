@@ -28,8 +28,8 @@ async function main() {
     if (!env.BODY || !env.TREASURY) {
         throw Error('No BODY or TREASURY address set in .env!')
     }
-    const Spa = await ethers.getContractFactory("Spa");
-    const SOUL = await Spa.deploy(env.BODY, env.TREASURY, constants.WeiPerEther)
+    const Thermae = await ethers.getContractFactory("Thermae");
+    const SOUL = await Thermae.deploy(env.BODY, env.TREASURY, constants.WeiPerEther)
     await SOUL.deployed()
 
     await Promise.all(tiersData.map(async (t, i) => {
@@ -38,9 +38,9 @@ async function main() {
 
     const ZenGarden = await ethers.getContractFactory("ZenGarden");
     const zenGarden = await ZenGarden.attach(env.BODY)
-    await zenGarden.functions.updateSpa(SOUL.address);
+    await zenGarden.functions.updateThermae(SOUL.address);
 
-    console.log("Spa deployed to:", SOUL.address);
+    console.log("Thermae deployed to:", SOUL.address);
     fs.appendFileSync('.env', `SOUL=${SOUL.address}\n`);
 }
 // We recommend this pattern to be able to use async/await everywhere
