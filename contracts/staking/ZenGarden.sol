@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 /**
  * @title ZenGarden
  * @notice Zen Garden is the best place to rest your MIND. Deposit MIND and earn rewards.
- * BODY is a recipt token and is what entitles accounts to receive rewards.
+ * BODY is a receipt token and is what entitles accounts to receive rewards.
  */
 contract ZenGarden is ERC20("Body", "BODY"), Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -26,7 +26,8 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
     struct AccountData {
         // keep track of deposited MIND to allow safeTransfering BODY to Thermae contract and keep receiving rewards
         uint256 depositedAmount;
-        mapping(IERC20 => uint256) lastClaimedRewardPerShare;
+        mapping(IERC20 => uint256) rewardIndex;
+        mapping(IERC20 => uint256) pendingAmount;
     }
 
     mapping(address => AccountData) internal _accountData;
@@ -57,48 +58,58 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         _mind = mind_;
     }
 
-    function _increaseAmount(address account, uint256 amount) internal {
-        _multiClaimFor(account, rewards());
-        AccountData storage toData = _accountData[account];
-        toData.depositedAmount += amount;
-        emit Enter(account, amount);
-    }
-
-    function _decreaseAmount(address account, uint256 amount) internal {
-        _multiClaimFor(account, rewards());
-        AccountData storage fromData = _accountData[account];
-        fromData.depositedAmount -= amount;
-        emit Exit(account, amount);
-    }
-
     function _claimableAmountFor(
         uint256 depositedAmount_,
-        uint256 lastClaimedRewardPerShare,
+        uint256 rewardIndex,
         uint256 currentRewardPerShare
     ) internal pure returns (uint256) {
         if (
-            lastClaimedRewardPerShare == currentRewardPerShare ||
-            currentRewardPerShare == 0
+            rewardIndex == currentRewardPerShare || currentRewardPerShare == 0
         ) {
             return 0;
         } else {
-            uint256 delta = currentRewardPerShare - lastClaimedRewardPerShare;
+            uint256 delta = currentRewardPerShare - rewardIndex;
             uint256 claimableMult = delta * depositedAmount_;
             uint256 precision = rewardPerSharePrecision();
             return claimableMult >= precision ? claimableMult / precision : 0;
         }
     }
 
+    function calculateAccruedReward(address account, IERC20 reward)
+        public
+        view
+        returns (uint256 amount)
+    {
+        AccountData storage accountData = _accountData[account];
+        uint256 current = _rewardPerShare[reward];
+        amount = _claimableAmountFor(
+            accountData.depositedAmount,
+            accountData.rewardIndex[reward],
+            current
+        );
+        amount += accountData.pendingAmount[reward];
+    }
+
+    function accrueRewardForAccount(address account, IERC20 reward)
+        public
+        returns (uint256)
+    {
+        AccountData storage accountData = _accountData[account];
+        uint256 current = _rewardPerShare[reward];
+        uint256 amount = _claimableAmountFor(
+            accountData.depositedAmount,
+            accountData.rewardIndex[reward],
+            current
+        );
+        accountData.rewardIndex[reward] = current;
+        uint256 newAmount = accountData.pendingAmount[reward] + amount;
+        accountData.pendingAmount[reward] = newAmount;
+        return newAmount;
+    }
+
     function _claimFor(address account, IERC20 reward) internal {
         if (account != address(0)) {
-            AccountData storage accountData = _accountData[account];
-            uint256 current = _rewardPerShare[reward];
-            uint256 amount = _claimableAmountFor(
-                accountData.depositedAmount,
-                accountData.lastClaimedRewardPerShare[reward],
-                current
-            );
-            accountData.lastClaimedRewardPerShare[reward] = current;
+            uint256 amount = accrueRewardForAccount(account, reward);
             if (amount > 0) {
                 reward.safeTransfer(account, amount);
                 emit Claim(account, address(reward), amount);
@@ -127,7 +138,7 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         return _rewards.values();
     }
 
-    function spa() public view returns (address) {
+    function thermae() public view returns (address) {
         return _thermae;
     }
 
@@ -158,9 +169,11 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
      */
     function enter(uint256 amount) public {
         address account = _msgSender();
-        _increaseAmount(account, amount);
-        _mint(account, amount);
         _mind.safeTransferFrom(account, address(this), amount);
+        AccountData storage data = _accountData[account];
+        data.depositedAmount += amount;
+        _mint(account, amount);
+        emit Enter(account, amount);
     }
 
     /**
@@ -171,9 +184,11 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
     function exit(uint256 amount) public {
         address account = _msgSender();
         require(balanceOf(account) >= amount, "EXIT: Amount too big");
-        _decreaseAmount(account, amount);
+        AccountData storage data = _accountData[account];
+        data.depositedAmount -= amount;
         _burn(account, amount);
         _mind.safeTransfer(account, amount);
+        emit Exit(account, amount);
     }
 
     /**
@@ -186,7 +201,7 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         return
             _claimableAmountFor(
                 accountData.depositedAmount,
-                accountData.lastClaimedRewardPerShare[reward],
+                accountData.rewardIndex[reward],
                 current
             );
     }
@@ -230,36 +245,19 @@ contract ZenGarden is ERC20("Body", "BODY"), Ownable {
         address recipient,
         uint256 amount
     ) internal virtual override {
-        // if locking into or releasing from Thermae do not update deposited amounts
-        if (recipient != _thermae && sender != _thermae) {
-            _decreaseAmount(sender, amount);
-            _increaseAmount(recipient, amount);
+        uint256 len = _rewards.length();
+        for (uint16 i = 0; i < len; ++i) {
+            IERC20 reward = IERC20(_rewards.at(i));
+            accrueRewardForAccount(sender, reward);
+            accrueRewardForAccount(recipient, reward);
         }
         super._transfer(sender, recipient, amount);
     }
 
-    /**
-     * @notice Reduce the deposited amount of from and increase deposited amount of to
-     * this function is necessary to allow the treasury to accumulate rewards when users withdraw early from Thermae
-     * @dev this function can only be called from Thermae on early withdrawal
-     */
-    function transferDepositedAmount(
-        address from,
-        address to,
-        uint256 amount
-    ) public {
-        require(
-            _msgSender() == _thermae,
-            "Only Thermae contract can invoke such funtion"
-        );
-        _decreaseAmount(from, amount);
-        _increaseAmount(to, amount);
-    }
-
     // ADMIN METHODS
-    function updateThermae(address spa_) public onlyOwner {
-        _thermae = spa_;
-        emit ThermaeUpdate(spa_);
+    function updateThermae(address thermae_) public onlyOwner {
+        _thermae = thermae_;
+        emit ThermaeUpdate(thermae_);
     }
 
     function addReward(address token) public onlyOwner {

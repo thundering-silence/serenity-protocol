@@ -67,21 +67,21 @@ library DataTypes {
         uint256 accumulatedAmount;
     }
 
-    /**@title Thermae */
+    /**@title Membership */
     enum Tier {
-        Calm,
-        Peaceful,
-        Serene
+        SERENE,
+        PEACEFUL
     }
 
     struct TierConfig {
         uint256 feeReductionPercent;
-        uint256 minLockPeriod;
-        uint256 receiptRatio; // how much SOUL to mint as receipt for locking 1 BODY: 10 Serene | 5 Peaceful | 1 Calm
+        // uint256 minLockPeriod;
+        // uint256 receiptRatio; // how much SOUL to mint as receipt for locking 1 BODY: 10 Serene | 5 Peaceful | 1 Calm
+        uint16 maxMembers;
     }
 
+    /**@title Thermae */
     struct MemberData {
-        Tier tier;
         uint256 depositedAmount;
         uint256 unlockTime;
     }

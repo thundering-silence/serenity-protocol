@@ -324,7 +324,7 @@ contract Pool is PoolStorage {
         if (isCollateral(account)) {
             uint256 multiplier = _lendingConfig.collateralFactor;
             if (isLiquidating) {
-                multiplier = _thermae.calculateLiquidationThreshold(
+                multiplier = _perksAggregator.calculateLiquidationThreshold(
                     account,
                     _lendingConfig.collateralFactor,
                     _lendingConfig.maxLiquidationThreshold
@@ -448,7 +448,7 @@ contract Pool is PoolStorage {
     {
         uint256 baseFee = ((amount * (1 ether + _flashLoanConfig.fee)) /
             1 ether) - amount;
-        return _thermae.calculateFee(account, baseFee);
+        return _perksAggregator.calculateFee(account, baseFee);
     }
 
     function flashLoan(

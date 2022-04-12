@@ -10,77 +10,42 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "hardhat/console.sol";
 
 import "../staking/interfaces/IZenGarden.sol";
+// import "./Ticketing.sol";
+
 import "../libraries/DataTypesLib.sol";
 
 /**
  * @title Thermae
  * @notice the Thermae is a place where you can rest your BODY and relax.
  * SOUL is the receipt token for locking up BODY.
- * SOUL is non safeTransferable
+ * SOUL is non transferable and used for governance
  */
 contract Thermae is ERC20("Soul", "SOUL"), Ownable {
     using SafeERC20 for IZenGarden;
 
+    uint256 public immutable SECOND_TO_BODY = 50;
+    uint256 public immutable MIND_TO_BODY = 10;
 
     IZenGarden internal _zenGarden;
     address internal _treasury;
-    uint256 internal _minLockAmount;
-    mapping(DataTypes.Tier => DataTypes.TierConfig) internal _tiers;
 
-    struct MemberData {
-        DataTypes.Tier tier;
-        uint256 unlockTime;
-        uint256 depositedAmount;
-    }
     mapping(address => DataTypes.MemberData) internal _members;
 
-    event Join(address indexed account, uint256 unlockTime);
+    event Join(address indexed account, uint256 rank);
     event Deposit(address indexed account, uint256 amount);
     event ProlongLock(address indexed account, uint256 newUnlockTime);
     event Withdraw(address indexed account, uint256 amount);
 
-    event TierConfigUpdate(
-        DataTypes.Tier tier,
-        uint256 feeReduction,
-        uint256 minLock,
-        uint256 receiptRatio
-    );
     event UpdateZenGarden(address value);
     event UpdateTreasury(address value);
     event UpdateMinLockAmount(uint256 value);
 
     constructor(
         IZenGarden zenGarden_,
-        address treasury_,
-        uint256 minLockAmount_
+        address treasury_
     ) {
         _zenGarden = zenGarden_;
         _treasury = treasury_;
-        _minLockAmount = minLockAmount_;
-    }
-
-    /**
-     * @notice Calculate withdrawal penalty based on time remining to unlock and membership tier
-     * if the unlock period has been prolonged beyond the maximum minLockPeriod the fee will me the maximised
-     * else the fee will be reduced linearly every second
-     */
-    function _withdrawalPenalty(
-        uint256 amount,
-        uint256 start,
-        uint256 end,
-        uint256 currentTime
-    ) internal pure returns (uint256) {
-        uint256 maxPenalty = (maxWithdrawalPenalty() * amount) / 1 ether;
-        uint256 remaining = end - currentTime;
-        uint256 lockTime = end - start;
-        if (remaining >= lockTime) {
-            return maxPenalty;
-        }
-        return (remaining * maxPenalty) / lockTime;
-    }
-
-    function maxWithdrawalPenalty() public pure returns (uint256) {
-        return 5 * 1e17;
     }
 
     function zenGarden() public view returns (IZenGarden) {
@@ -89,14 +54,6 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
 
     function treasury() public view returns (address) {
         return _treasury;
-    }
-
-    function tierConfig(DataTypes.Tier tier_)
-        public
-        view
-        returns (DataTypes.TierConfig memory)
-    {
-        return _tiers[tier_];
     }
 
     function accountData(address account)
@@ -110,62 +67,41 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
     /**
      * @notice Join the Thermae
      * @param amount - the amount to deposit
-     * @param lockPeriod - te amount of seconds to stay in the Thermae
+     * @param lockPeriod - the amount of seconds to stay in the Thermae
      */
     function join(uint256 amount, uint256 lockPeriod) public {
         DataTypes.MemberData storage data = _members[_msgSender()];
-        require(data.depositedAmount == 0, "ENTER: Not a new member");
-        require(amount >= _minLockAmount, "ENTER: Amount too small");
-        require(
-            lockPeriod >= _tiers[DataTypes.Tier.Calm].minLockPeriod,
-            "ENTER: Lock period too short"
-        );
-
-        DataTypes.Tier tier = DataTypes.Tier.Calm;
-        if (lockPeriod >= _tiers[DataTypes.Tier.Serene].minLockPeriod) {
-            tier = DataTypes.Tier.Serene;
-        } else if (
-            lockPeriod >= _tiers[DataTypes.Tier.Peaceful].minLockPeriod
-        ) {
-            tier = DataTypes.Tier.Peaceful;
-        }
-
-        data.tier = tier;
+        require(data.depositedAmount == 0, "Thermae: Already joined");
         data.unlockTime = block.timestamp + lockPeriod;
         data.depositedAmount = amount;
 
         _zenGarden.safeTransferFrom(_msgSender(), address(this), amount);
-        _mint(_msgSender(), amount * _tiers[data.tier].receiptRatio);
 
-        emit Join(_msgSender(), data.unlockTime);
+        _mint(
+            _msgSender(),
+            (amount * SECOND_TO_BODY * lockPeriod) / MIND_TO_BODY
+        );
+
+        emit Join(_msgSender(), amount);
     }
 
     /**
      * @notice Prolong the time to stay in the Thermae
-     * @dev msg cender needs to already have joined the Thermae
+     * @dev sender needs to already have joined the Thermae
      * @param additionalTime - the amount of time to add to the lockPeriod
      */
     function prolongLock(uint256 additionalTime) public {
         DataTypes.MemberData storage data = _members[_msgSender()];
-        require(data.depositedAmount != 0, "PROLONG LOCK: Not a member");
+        require(data.depositedAmount != 0, "Thermae: Not a member");
 
         uint256 newUnlockTime = data.unlockTime + additionalTime;
         uint256 lockPeriod = newUnlockTime - block.timestamp;
 
-        DataTypes.Tier tier = DataTypes.Tier.Calm;
-        if (lockPeriod >= _tiers[DataTypes.Tier.Serene].minLockPeriod) {
-            tier = DataTypes.Tier.Serene;
-        } else if (
-            lockPeriod >= _tiers[DataTypes.Tier.Peaceful].minLockPeriod
-        ) {
-            tier = DataTypes.Tier.Peaceful;
-        }
+        uint256 expectedAmount = (data.depositedAmount *
+            SECOND_TO_BODY *
+            lockPeriod) / MIND_TO_BODY;
 
-        uint256 expectedAmount = _tiers[tier].receiptRatio *
-            data.depositedAmount;
         uint256 amountToMint = expectedAmount - balanceOf(_msgSender());
-
-        data.tier = tier;
         data.unlockTime = newUnlockTime;
         _mint(_msgSender(), amountToMint);
 
@@ -179,12 +115,20 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
      */
     function deposit(uint256 amount) public {
         DataTypes.MemberData storage data = _members[_msgSender()];
-        require(data.depositedAmount >= 0, "DEPOSIT: Not yet a member");
+        require(data.depositedAmount >= 0, "Thermae: Not a member");
 
-        data.depositedAmount += amount;
+        uint256 newDepositedAmount = data.depositedAmount + amount;
+        uint256 lockPeriod = data.unlockTime - block.timestamp;
+
+        uint256 expectedAmount = (data.depositedAmount *
+            SECOND_TO_BODY *
+            lockPeriod) / MIND_TO_BODY;
+
+        uint256 amountToMint = expectedAmount - balanceOf(_msgSender());
+        data.depositedAmount = newDepositedAmount;
 
         _zenGarden.safeTransferFrom(_msgSender(), address(this), amount);
-        _mint(_msgSender(), amount * _tiers[data.tier].receiptRatio);
+        _mint(_msgSender(), amountToMint);
 
         emit Deposit(_msgSender(), amount);
     }
@@ -197,22 +141,20 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
         DataTypes.MemberData storage data = _members[_msgSender()];
         require(
             data.unlockTime < block.timestamp,
-            "WITHDRAW: TimeLock not expired"
+            "Thermae: TimeLock not expired"
         );
+        uint256 amountToWithdraw = data.depositedAmount;
         data.depositedAmount = 0;
         data.unlockTime = 0;
-        _burn(
-            _msgSender(),
-            data.depositedAmount * _tiers[data.tier].receiptRatio
-        );
-        _zenGarden.safeTransfer(_msgSender(), data.depositedAmount);
+        _burn(_msgSender(), balanceOf(_msgSender()));
+        _zenGarden.safeTransfer(_msgSender(), amountToWithdraw);
 
-        emit Withdraw(_msgSender(), data.depositedAmount);
+        emit Withdraw(_msgSender(), amountToWithdraw);
     }
 
     /**
      * @notice Compute withdrawal penalty for caller
-     * @return uint - Fee fro withdrawing now
+     * @return uint - Fee for withdrawing now
      */
     function withdrawalPenalty() public view returns (uint256) {
         DataTypes.MemberData storage data = _members[_msgSender()];
@@ -220,104 +162,38 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
             return 0;
         } else {
             return
-                _withdrawalPenalty(
-                    data.depositedAmount,
-                    data.unlockTime - _tiers[data.tier].minLockPeriod,
-                    data.unlockTime,
-                    block.timestamp
-                );
+                (data.depositedAmount * (data.unlockTime - block.timestamp)) /
+                data.unlockTime;
         }
     }
 
     /**
      * @notice Force withdraw funds from Thermae
-     * @dev Requires time lock to NOT have expired yet
+     * @dev Requires time lock to NOT have expired
+     * the penalty for withdrawing early is sent to the treasury
+     * which will then need to withdraw from ZenGarden and burn the MIND
      */
     function forceWithdraw() public {
         DataTypes.MemberData storage data = _members[_msgSender()];
         require(
             data.unlockTime >= block.timestamp,
-            "FORCE WITHDRAW: TimeLock has expired"
+            "Thermae: TimeLock has expired"
         );
-        DataTypes.TierConfig storage tier = _tiers[data.tier];
-        uint256 penalty = _withdrawalPenalty(
-            data.depositedAmount,
-            data.unlockTime - tier.minLockPeriod,
-            data.unlockTime,
-            block.timestamp
-        );
-        _burn(_msgSender(), data.depositedAmount * tier.receiptRatio);
-        _zenGarden.safeTransfer(_msgSender(), data.depositedAmount - penalty);
-
-        data.depositedAmount = 0;
+        _burn(_msgSender(), balanceOf(_msgSender()));
+        uint256 amountWithdrawn = data.depositedAmount;
         data.unlockTime = 0;
+        data.depositedAmount = 0;
 
-        _zenGarden.transferDepositedAmount(_msgSender(), _treasury, penalty);
+        uint256 penalty = withdrawalPenalty();
+        _zenGarden.safeTransfer(_msgSender(), amountWithdrawn - penalty);
+        // treasury will need to burn these tokens eventually
         _zenGarden.safeTransfer(_treasury, penalty);
+
+        emit Withdraw(_msgSender(), amountWithdrawn);
     }
 
-    /**
-     * @notice Calculate fee starting from basefee by looking at the tier the user belongs to
-     * @param account - the account for which to calculate the fee
-     * @param baseFee - the maximum fee payable
-     * @return uint - the fee to pay
-     */
-    function calculateFee(address account, uint256 baseFee)
-        external
-        view
-        returns (uint256)
-    {
-        DataTypes.MemberData storage data = _members[account];
-        // tier defaults to 0 so need to check depositedAmount
-        if (data.depositedAmount > 0) {
-            DataTypes.TierConfig storage config = _tiers[data.tier];
-            uint256 feePercentToPay = 1 ether - config.feeReductionPercent;
-            return (baseFee * feePercentToPay) / 1 ether;
-        } else {
-            return baseFee;
-        }
-    }
 
-    /**
-     * @notice Calculate the liquidation threshold for the account
-     * @param account - the account for which to calculate the threshold
-     * @param baseCollateral - the base collateralFactor set on the pool
-     * @param maxCollateral - the maximum collateralFactor set on the pool
-     * @return uint - the liquidation threshold
-     */
-    function calculateLiquidationThreshold(
-        address account,
-        uint256 baseCollateral,
-        uint256 maxCollateral
-    ) external view returns (uint256) {
-        DataTypes.MemberData storage data = _members[account];
-        // tier defaults to 0 so need to check depositedAmount
-        if (data.depositedAmount > 0) {
-            DataTypes.TierConfig storage config = _tiers[data.tier];
-            uint256 delta = maxCollateral - baseCollateral;
-            uint256 extraProtection = (delta * config.feeReductionPercent) /
-                1 ether;
-
-            return baseCollateral + extraProtection;
-        } else {
-            return baseCollateral;
-        }
-    }
-
-    // ADMIN METHODS
-    function updateTierConfig(
-        DataTypes.Tier tier_,
-        DataTypes.TierConfig memory config
-    ) public onlyOwner {
-        _tiers[tier_] = config;
-        emit TierConfigUpdate(
-            tier_,
-            config.feeReductionPercent,
-            config.minLockPeriod,
-            config.receiptRatio
-        );
-    }
-
+    // ADMIN METHOD
     function updateZenGarden(address value) public onlyOwner {
         _zenGarden = IZenGarden(value);
         emit UpdateZenGarden(value);
@@ -326,11 +202,6 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
     function updateTreasury(address value) public onlyOwner {
         _treasury = value;
         emit UpdateTreasury(value);
-    }
-
-    function updateMinLockAmount(uint256 value) public onlyOwner {
-        _minLockAmount = value;
-        emit UpdateMinLockAmount(value);
     }
 
     // BAN TRANSFERS

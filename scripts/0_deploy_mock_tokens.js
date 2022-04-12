@@ -35,7 +35,7 @@ async function main() {
     await link.functions.mint(recipientAddress, `${999 * 1e18}`);
 
     await mind.functions.grantRole(utils.id("MINTER_ROLE"), this.user.address);
-    // await link.functions.mint(recipientAddress, `${999 * 1e18}`);
+    await mind.functions.mint(recipientAddress, `${999 * 1e18}`);
 }
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.

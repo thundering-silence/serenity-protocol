@@ -5,11 +5,13 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "../feesCollector/interfaces/IFeesCollector.sol";
-import "./interfaces/IPoolStorage.sol";
 import "../libraries/DataTypesLib.sol";
 import "../membership/interfaces/IThermae.sol";
 import "../oracle/interfaces/IPriceOracle.sol";
 import "../rewards/interfaces/IRewardsManager.sol";
+
+import "./interfaces/IPoolStorage.sol";
+import "./interfaces/IPerksAggregator.sol";
 
 abstract contract PoolStorage is AccessControl {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -20,7 +22,7 @@ abstract contract PoolStorage is AccessControl {
     IERC20 public immutable _underlying;
     IPriceOracle internal _oracle;
     IFeesCollector internal _feesCollector;
-    IThermae internal _thermae;
+    IPerksAggregator internal _perksAggregator;
     IRewardsManager internal _rewardsManager;
 
     DataTypes.LendingConfig internal _lendingConfig;
@@ -28,7 +30,7 @@ abstract contract PoolStorage is AccessControl {
     DataTypes.FlashLoanConfig internal _flashLoanConfig;
 
     uint256 internal _index = 1e18; // keeps track of interest for Loans
-    uint256 internal _depositIndex = 1e18; // keeps track of interest for Supply
+    uint256 internal _depositIndex = 1e18; // storing it allows to alter the config and still have it work properly
     uint256 internal _lastIndexUpdateTimestamp = block.timestamp; // keeps track of the last time indexes were updated
 
     uint256 internal _totalLoans;
@@ -66,7 +68,7 @@ abstract contract PoolStorage is AccessControl {
         address underlying_,
         address oracle_,
         address feesCollector_,
-        address spa_,
+        address perksAggregator_,
         address admin_,
         DataTypes.LendingConfig memory lendingConfig_,
         DataTypes.InterestRateConfig memory interestRateConfig_,
@@ -77,7 +79,7 @@ abstract contract PoolStorage is AccessControl {
         _underlying = IERC20(underlying_);
         _oracle = IPriceOracle(oracle_);
         _feesCollector = IFeesCollector(feesCollector_);
-        _thermae = IThermae(spa_);
+        _perksAggregator = IPerksAggregator(perksAggregator_);
 
         _lendingConfig = lendingConfig_;
         _rateConfig = interestRateConfig_;
@@ -97,8 +99,8 @@ abstract contract PoolStorage is AccessControl {
         return address(_oracle);
     }
 
-    function spa() public view returns (address) {
-        return address(_thermae);
+    function perksAggregator() public view returns (address) {
+        return address(_perksAggregator);
     }
 
     function feesCollector() public view returns (address) {

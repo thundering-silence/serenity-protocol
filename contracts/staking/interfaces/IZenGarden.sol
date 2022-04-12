@@ -17,6 +17,15 @@ interface IZenGarden is IERC20, IOwnable {
 
     function exit(uint256 amount) external;
 
+    function calculateAccruedReward(address account, IERC20 reward)
+        external
+        view
+        returns (uint256 amount);
+
+    function accrueRewardForAccount(address account, IERC20 reward)
+        external
+        returns (uint256);
+
     function claimableAmount(IERC20 reward) external view returns (uint256);
 
     function claim(IERC20 reward) external;
