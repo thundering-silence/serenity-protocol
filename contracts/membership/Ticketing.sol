@@ -8,6 +8,7 @@ import "../libraries/DataTypesLib.sol";
 
 contract Ticketing is ERC1155(""), Ownable {
     mapping(uint256 => uint256) public tokenDiscount; // 1 ether == 100%
+    mapping(uint256 => uint256) public tokenMaxStack;
     uint256 private _maxId;
 
     event UpdateTokenDiscount(uint256 id, uint256 discount);
@@ -17,7 +18,9 @@ contract Ticketing is ERC1155(""), Ownable {
         uint256 discount;
         for (uint256 i = 0; i <= _maxId; ++i) {
             uint256 balance = balanceOf(account, i);
-            discount += (balance * tokenDiscount[i]) / 1 ether;
+            uint256 maxStack = tokenMaxStack[i];
+            uint256 amount = balance >= maxStack ? maxStack : balance;
+            discount += (amount * tokenDiscount[i]) / 1 ether;
         }
         return discount > 1 ether ? 1 ether : discount;
     }
@@ -65,16 +68,4 @@ contract Ticketing is ERC1155(""), Ownable {
         _maxId = value;
         emit UpdateMaxId(value);
     }
-
-    // function updateTierConfig(
-    //     DataTypes.Tier tier,
-    //     DataTypes.TierConfig memory config
-    // ) public onlyOwner {
-    //     _tiers[tier] = config;
-    //     emit TierConfigUpdate(
-    //         tier,
-    //         config.feeReductionPercent,
-    //         config.maxMembers
-    //     );
-    // }
 }

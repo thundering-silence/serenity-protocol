@@ -6,10 +6,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "../../libraries/DataTypesLib.sol";
 
 interface ITicketing {
-    function tierConfig(DataTypes.Tier tier)
-        external
-        view
-        returns (DataTypes.TierConfig memory);
+    // function tierConfig(DataTypes.Tier tier)
+    //     external
+    //     view
+    //     returns (DataTypes.TierConfig memory);
 
     function accountDiscount(address account) external view returns (uint256);
 
@@ -30,8 +30,8 @@ interface ITicketing {
 
     function updateURI(string memory newUri) external;
 
-    function updateTierConfig(
-        DataTypes.Tier tier,
-        DataTypes.TierConfig memory config
-    ) external;
+    // function updateTierConfig(
+    //     DataTypes.Tier tier,
+    //     DataTypes.TierConfig memory config
+    // ) external;
 }

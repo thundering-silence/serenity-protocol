@@ -15,10 +15,10 @@ interface IThermae is IERC20, IOwnable {
 
     function treasury() external view returns (address);
 
-    function tierConfig(DataTypes.Tier tier_)
-        external
-        view
-        returns (DataTypes.TierConfig memory);
+    // function tierConfig(DataTypes.Tier tier_)
+    //     external
+    //     view
+    //     returns (DataTypes.TierConfig memory);
 
     function accountData(address account)
         external
@@ -33,21 +33,11 @@ interface IThermae is IERC20, IOwnable {
 
     function withdraw(uint256 amount) external;
 
-    function calculateFee(address account, uint256 baseFee)
-        external
-        view
-        returns (uint256);
 
-    function calculateLiquidationThreshold(
-        address account,
-        uint256 baseCollateral,
-        uint256 maxCollateral
-    ) external view returns (uint256);
-
-    function updateTierConfig(
-        DataTypes.Tier tier_,
-        DataTypes.TierConfig memory config
-    ) external;
+    // function updateTierConfig(
+    //     DataTypes.Tier tier_,
+    //     DataTypes.TierConfig memory config
+    // ) external;
 
     function withdrawalPenalty() external view returns (uint256);
 

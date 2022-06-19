@@ -1,8 +1,17 @@
 const { ethers } = require('hardhat');
-const {utils, constants, BigNumber} = require('ethers')
+const { utils, constants, BigNumber } = require('ethers')
 const fs = require('fs');
 
 require('dotenv').config()
+
+const tokensToCreate = [
+    ['Chainlink Link', 'LINK'],
+    ['Circle USD', 'USDC'],
+    ['Tether USD', 'USDT'],
+    ['DAI', 'DAI'],
+    ['Wrapped ETH', 'WETH'],
+    ['Wrapped BTC', 'WBTC'],
+]
 
 async function main() {
     console.log("DEPLOYING TOKENS")
@@ -15,24 +24,27 @@ async function main() {
     const wNative = await MSMBERC20.deploy('Wrapped Native', 'WNATIVE', 0);
     await wNative.deployed();
     console.log(`WNATIVE deployed to ${wNative.address}`);
+    fs.appendFileSync('.env', `WNATIVE=${wNative.address}\n`);
 
-    const link = await MSMBERC20.deploy('Chainlink Link', 'LINK', 0);
-    await link.deployed();
-    console.log(`LINK deployed to ${link.address}`);
+    await Promise.all(tokensToCreate.map(async (tokenData) => {
+        const token = await MSMBERC20.deploy(tokenData[0], tokenData[1], 0);
+        await token.deployed();
+        console.log(`${tokenData[1]} deployed to ${token.address}`);
+        fs.appendFileSync('.env', `${tokenData[1]}=${token.address}\n`);
+        await token.functions.grantRole(utils.id("MINTER_ROLE"), this.user.address);
+        await token.functions.mint(recipientAddress, `${999 * 1e18}`);
+    }))
 
     const mind = await MSMBERC20.deploy('Mind', 'MIND', constants.WeiPerEther.mul(BigNumber.from(`${1e9}`)));
     await mind.deployed();
     console.log(`MIND deployed to ${mind.address}`);
 
-    fs.appendFileSync('.env', `WNATIVE=${wNative.address}\n`);
-    fs.appendFileSync('.env', `LINK=${link.address}\n`);
     fs.appendFileSync('.env', `MIND=${mind.address}\n`);
 
     await wNative.functions.grantRole(utils.id("MINTER_ROLE"), this.user.address);
     await wNative.functions.mint(recipientAddress, `${999 * 1e18}`);
 
-    await link.functions.grantRole(utils.id("MINTER_ROLE"), this.user.address);
-    await link.functions.mint(recipientAddress, `${999 * 1e18}`);
+
 
     await mind.functions.grantRole(utils.id("MINTER_ROLE"), this.user.address);
     await mind.functions.mint(recipientAddress, `${999 * 1e18}`);

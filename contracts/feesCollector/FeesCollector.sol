@@ -65,7 +65,6 @@ contract FeesCollector is Ownable {
         require(IERC20(pool.underlying()).balanceOf(address(this)) >= amount);
         DataTypes.FeeDistributionParams
             storage params = _poolFeeDistributionParams[pool];
-        console.log("updateAccAmount=%s", amount);
         params.accumulatedAmount += amount;
     }
 

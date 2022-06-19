@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "../membership/interfaces/ITicketing.sol";
 import "../membership/interfaces/IThermae.sol";
 
-contract PerkAggregator is Ownable {
+contract PerksAggregator is Ownable {
     ITicketing internal _ticketing;
     IThermae internal _thermae;
     uint256 internal _calmThreshold = 100 ether;

@@ -1,15 +1,24 @@
 const { ethers } = require('hardhat');
 const fs = require('fs');
 const { utils, constants, BigNumber } = require('ethers');
-const { solidityPack } = require('ethers/lib/utils');
 
 require('dotenv').config()
 const env = process.env;
+
+const tokensToCreate = [
+    ['Chainlink Link', 'LINK'],
+    ['Cirle USD', 'USDC'],
+    ['Tether USD', 'USDT'],
+    ['DAI', 'DAI'],
+    ['Wrapped ETH', 'WETH'],
+    ['Wrapped BTC', 'WBTC'],
+]
 
 async function main() {
     console.log("DEPLOYING POOLS")
     this.signers = await ethers.getSigners();
     this.user = this.signers[0]
+    const events = []
     if (!env.WNATIVE || !env.LINK) {
         throw Error('No WNATIVE or LINK address set in .env!')
     }
@@ -63,32 +72,52 @@ async function main() {
     const NativePool = await Pool.attach(event0.args[1])
     await NativePool.grantRole(utils.id("DELEGATOR_ROLE"), env.ENTRYPOINT);
 
-    const tx1 = await entrypoint.createPool(
-        env.LINK,
-        env.FEES_COLLECTOR,
-        [
-            `${0.75 * 1e18}`, // collateralFactor
-            `${0.1 * 1e18}`, // liquidationFee
-            `${0.95 * 1e18}`, // maxLiquidationThreshold
-            `${0.15 * 1e18}`, // fee
-            true, // allow borrowing
-        ],
-        [
-            `${0}`, // baseRate,
-            `${.07 * 1e18}`, // slope1
-            `${5 * 1e18}`, // slope2
-            `${.75 * 1e18}` // optimal Util
-        ],
-        [
-            true, // activate flash loans
-            `${.0008 * 1e18}`, // flashFee 0.08%
-        ]
-    );
-    const tx1Receipt = await tx1.wait()
-    const event1 = tx1Receipt.events.find(e => e.event == 'NewPool')
-    console.log(`Pool for: ${event1.args[0]} deployed to ${event1.args[1]}`);
-    const LinkPool = await Pool.attach(event1.args[1])
-    await LinkPool.grantRole(utils.id("DELEGATOR_ROLE"), env.ENTRYPOINT);
+    await Promise.all(tokensToCreate.map(async (tokenData, i) => {
+        const tx1 = await entrypoint.createPool(
+            env[`${tokenData[1]}`],
+            env.FEES_COLLECTOR,
+            [
+                `${0.75 * 1e18}`, // collateralFactor
+                `${0.1 * 1e18}`, // liquidationFee
+                `${0.95 * 1e18}`, // maxLiquidationThreshold
+                `${0.15 * 1e18}`, // fee
+                true, // allow borrowing
+            ],
+            [
+                `${0}`, // baseRate,
+                `${.07 * 1e18}`, // slope1
+                `${5 * 1e18}`, // slope2
+                `${.75 * 1e18}` // optimal Util
+            ],
+            [
+                true, // activate flash loans
+                `${.0008 * 1e18}`, // flashFee 0.08%
+            ]
+        );
+        const tx1Receipt = await tx1.wait()
+        const event1 = tx1Receipt.events.find(e => e.event == 'NewPool')
+        console.log(`Pool for: ${event1.args[0]} deployed to ${event1.args[1]}`);
+        const newPool = await Pool.attach(event1.args[1])
+        await newPool.grantRole(utils.id("DELEGATOR_ROLE"), env.ENTRYPOINT);
+        await rewardsManager.functions.updatePoolRewardConfig(
+            newPool.address,
+            env.MIND,
+            BigNumber.from(`${5 * 1e18}`),
+            BigNumber.from(`${5 * 1e18}`)
+        )
+        await feesCollector.functions.setFeeDistributionParams(
+            newPool.address,
+            [
+                `${.375 * 1e18}`,
+                `${.375 * 1e18}`,
+                `${.25 * 1e18}`,
+                0
+            ]
+        )
+        await entrypoint.setPoolForUnderlying(event1.args[0], event1.args[1])
+        await entrypoint.supportNewAsset(env[`${tokenData[1]}`]);
+    }))
+
 
     // zen garden
     await zenGarden.functions.addReward(env.WNATIVE)
@@ -103,12 +132,7 @@ async function main() {
         BigNumber.from(`${5 * 1e18}`),
         BigNumber.from(`${10 * 1e18}`)
     )
-    await rewardsManager.functions.updatePoolRewardConfig(
-        LinkPool.address,
-        env.MIND,
-        BigNumber.from(`${5 * 1e18}`),
-        BigNumber.from(`${5 * 1e18}`)
-    )
+
     await rewardsManager.functions.activateReward(env.MIND, this.user.address);
 
     // fees collector
@@ -121,21 +145,11 @@ async function main() {
             0
         ]
     )
-    await feesCollector.functions.setFeeDistributionParams(
-        LinkPool.address,
-        [
-            `${.375 * 1e18}`,
-            `${.375 * 1e18}`,
-            `${.25 * 1e18}`,
-            0
-        ]
-    )
 
     // entry point
     await entrypoint.setPoolForUnderlying(event0.args[0], event0.args[1])
-    await entrypoint.setPoolForUnderlying(event1.args[0], event1.args[1])
     await entrypoint.supportNewAsset(env.WNATIVE);
-    await entrypoint.supportNewAsset(env.LINK);
+
 }
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.

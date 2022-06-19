@@ -69,16 +69,14 @@ library DataTypes {
 
     /**@title Membership */
     enum Tier {
-        SERENE,
+        CALM,
         PEACEFUL
     }
 
-    struct TierConfig {
-        uint256 feeReductionPercent;
-        // uint256 minLockPeriod;
-        // uint256 receiptRatio; // how much SOUL to mint as receipt for locking 1 BODY: 10 Serene | 5 Peaceful | 1 Calm
-        uint16 maxMembers;
-    }
+    // struct TierConfig {
+    //     uint256 feeReductionPercent;
+    //     uint16 maxMembers;
+    // }
 
     /**@title Thermae */
     struct MemberData {

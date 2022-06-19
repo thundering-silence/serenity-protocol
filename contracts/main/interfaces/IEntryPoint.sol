@@ -25,6 +25,12 @@ interface IEntryPoint is IERC3156FlashLender, IERC3156FlashBorrower, IOwnable {
 
     function deposit(address asset, uint256 amount) external returns (uint256);
 
+    function depositBehalf(
+        address beneficiary,
+        address asset,
+        uint256 amount
+    ) external returns (uint256);
+
     function borrow(address asset, uint256 amount) external returns (uint256);
 
     function repay(address asset, uint256 amount) external returns (uint256);

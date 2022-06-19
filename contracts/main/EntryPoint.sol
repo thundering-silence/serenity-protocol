@@ -146,6 +146,22 @@ contract EntryPoint is IERC3156FlashBorrower, Ownable {
     }
 
     /**
+     * @notice Deposit assets in the protocol
+     * @param asset the token to deposit
+     * @param amount the amount to deposit
+     * @return depositAmount - the total deposit amount of underlying
+     */
+    function depositBehalf(address beneficiary, address asset, uint256 amount)
+        public
+        returns (uint256 depositAmount)
+    {
+        IPool pool = _storage.poolForUnderlying(asset);
+        depositAmount = pool.depositBehalf(beneficiary, amount, _msgSender());
+        _storage.toggleMarketForAccount(beneficiary, pool);
+        emit Deposit(beneficiary, asset, amount, _msgSender());
+    }
+
+    /**
      * @notice Borrow assets from the protocol
      * @param asset the token to borrow
      * @param amount the amount to borrow
@@ -360,7 +376,7 @@ contract EntryPoint is IERC3156FlashBorrower, Ownable {
             vars.toAsset,
             vars.toAmount
         );
-        console.log("asset=%s", vars.asset);
+        // console.log("asset=%s", vars.asset);
         return
             _storage.poolForUnderlying(vars.asset).flashLoan(
                 vars.receiver,
@@ -407,8 +423,8 @@ contract EntryPoint is IERC3156FlashBorrower, Ownable {
             vars.account != address(0),
             "FlashBorrower: Account is ZeroAddress"
         );
-        console.log("asset=%s", vars.asset);
-        console.log("token=%s", token);
+        // console.log("asset=%s", vars.asset);
+        // console.log("token=%s", token);
 
         require(vars.asset == token, "FlashBorrower: Borrowed token mismatch");
         require(

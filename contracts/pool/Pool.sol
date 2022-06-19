@@ -18,7 +18,7 @@ contract Pool is PoolStorage {
         address underlying,
         address oracle,
         address feesCollector,
-        address spa,
+        address perksAggregator,
         address admin,
         DataTypes.LendingConfig memory lendingConfig,
         DataTypes.InterestRateConfig memory rateConfig,
@@ -28,7 +28,7 @@ contract Pool is PoolStorage {
             underlying,
             oracle,
             feesCollector,
-            spa,
+            perksAggregator,
             admin,
             lendingConfig,
             rateConfig,
@@ -37,17 +37,13 @@ contract Pool is PoolStorage {
     {}
 
     /******HELPER METHODS */
-    function one() public pure returns (uint256) {
-        return 1 ether;
-    }
-
     function _calculateAccruedInterest(
-        uint256 prevIndex_,
-        uint256 currentIndex_,
-        uint256 multiplier_
+        uint256 prevIndex,
+        uint256 currentIndex,
+        uint256 multiplier
     ) internal pure returns (uint256 interest) {
-        if (prevIndex_ != 0) {
-            interest = (multiplier_ * (currentIndex_ - prevIndex_)) / one();
+        if (prevIndex != 0) {
+            interest = (multiplier * (currentIndex - prevIndex)) / 1 ether;
         }
     }
 
@@ -58,14 +54,14 @@ contract Pool is PoolStorage {
             ? (borrowRate() * secondsElapsed) / 31557600 // seconds in julian year (365.25 days)
             : 0;
 
-        _index = (_index * (one() + rateForTimeElapsed)) / one();
+        _index = (_index * (1 ether + rateForTimeElapsed)) / 1 ether;
 
-        uint256 nonTreasury = (rateForTimeElapsed * _lendingConfig.fee) / one();
-        uint256 depositRateForTimeElapsed = (currentUtilisation() *
-            nonTreasury) / one();
+        uint256 fees = (rateForTimeElapsed * _lendingConfig.fee) / 1 ether;
+        uint256 depositRateForTimeElapsed = (currentUtilisation() * fees) /
+            1 ether;
         _depositIndex =
-            (_depositIndex * (one() + depositRateForTimeElapsed)) /
-            one();
+            (_depositIndex * (1 ether + depositRateForTimeElapsed)) /
+            1 ether;
     }
 
     function _updateAccruedRewards() internal {
@@ -78,13 +74,20 @@ contract Pool is PoolStorage {
         _collaterals[account] = config;
     }
 
+    /**
+     * @notice internal deposit logic
+     * @dev called in deposit() and depositBehalf()
+     * @param account - the account for which the deposit is being made
+     * @param amount - self explanatory
+     * @param depositor - the origin of the funds
+     * @return depositAmount - the total deposited amount for account
+     */
     function _deposit(
         address account,
         uint256 amount,
         address depositor
     ) internal returns (uint256 depositAmount) {
         _updateAccruedRewards();
-
         // update position
         Snapshot storage position = _deposits[account];
         uint256 accruedInterest = _calculateAccruedInterest(
@@ -105,12 +108,19 @@ contract Pool is PoolStorage {
         _updateIndexes();
     }
 
+    /**
+     * @notice internal borrow logic
+     * @dev called both in borrow() and borrowBehalf()
+     * @param account - the account the loan will be opened for
+     * @param amount - loan amount
+     * @return borrowedAmount - total lent to account
+     */
     function _borrow(address account, uint256 amount)
         internal
         returns (uint256 borrowedAmount)
     {
-        require(_lendingConfig.allowBorrow, "BORROW: borrowing is disabled");
-        require(getCash() >= amount, "No more liquidity to borrow");
+        require(_lendingConfig.allowBorrow, "Pool: borrowing is disabled");
+        require(getCash() >= amount, "Pool: No more liquidity to borrow");
         _updateAccruedRewards();
         // update position
         Snapshot storage position = _debts[account];
@@ -131,12 +141,21 @@ contract Pool is PoolStorage {
         _updateIndexes();
     }
 
+    /**
+     * @notice internal logic for repaying a loan
+     * @dev called both in repay() and repayBehalf()
+     * @param account - the account for which to repay the loan
+     * @param amount - amount to repay
+     * @param repayer - the origin of the funds
+     * @return leftoverDebt - the remaingin loan amount
+     * @return actualAmount - the actual amount repayed (if amount was more than necessary)
+     */
     function _repay(
         address account,
         uint256 amount,
         address repayer
     ) internal returns (uint256 leftoverDebt, uint256 actualAmount) {
-        require(amount > 0, "Amount is 0");
+        require(amount > 0, "Pool: Amount is 0");
         _updateAccruedRewards();
         // update position
         Snapshot storage position = _debts[account];
@@ -184,6 +203,15 @@ contract Pool is PoolStorage {
         _updateIndexes();
     }
 
+    /**
+     * @notice internal withdraw logic
+     * @dev called in both withdraw() and withdrawBehalf()
+     * @param account - the account for which funds are being withdrawn
+     * @param amount - the amount to withdraw
+     * @param recipient- the recipient of the withdrawn funds
+     * @return leftoverDeposits - the remaining amount of deposits
+     * @return actualAmount - the actual amount withdraw ("amount" arg could be more than actual deposits)
+     */
     function _withdraw(
         address account,
         uint256 amount,
@@ -201,7 +229,7 @@ contract Pool is PoolStorage {
 
         uint256 totalDeposits = position.amount + position.accruedInterest;
         actualAmount = amount > totalDeposits ? totalDeposits : amount;
-        require(actualAmount <= getCash(), "Not enough liquidity");
+        require(actualAmount <= getCash(), "Pool: Not enough liquidity");
 
         // always withdraw interest first
         uint256 removeFromDeposits;
@@ -225,7 +253,7 @@ contract Pool is PoolStorage {
         _updateIndexes();
     }
 
-    /****** MAIN METHODS */
+    /****** PUBLIC METHODS */
     function underlyingPrice() public view returns (uint256) {
         return _oracle.getAssetPrice(address(_underlying));
     }
@@ -235,8 +263,11 @@ contract Pool is PoolStorage {
         if (_totalLoans == 0) {
             utilisation = 0;
         } else {
-            utilisation = (_totalLoans * one()) / _totalDeposits;
-            require(utilisation <= one(), "Utilisation rate beyond 100%");
+            utilisation = (_totalLoans * 1 ether) / _totalDeposits;
+            require(
+                utilisation <= 1 ether,
+                "Pool: Utilisation rate beyond 100%"
+            );
         }
     }
 
@@ -249,13 +280,13 @@ contract Pool is PoolStorage {
             rate = _rateConfig.baseRate + coefficient;
         } else {
             uint256 a = utilisation - _rateConfig.optimalUtilisation;
-            uint256 b = uint256(one()) - _rateConfig.optimalUtilisation;
-            uint256 c = (a * one()) / b;
+            uint256 b = 1 ether - _rateConfig.optimalUtilisation;
+            uint256 c = (a * 1 ether) / b;
             rate =
                 _rateConfig.baseRate +
                 _rateConfig.slope1 +
                 (c * _rateConfig.slope2) /
-                one();
+                1 ether;
         }
     }
 
@@ -267,6 +298,10 @@ contract Pool is PoolStorage {
         return _collaterals[account];
     }
 
+    /**
+     * @notice the amount of collateral
+     * @param account - the account for which to return the collateral amount
+     */
     function accountCollateralAmount(address account)
         public
         view
@@ -275,6 +310,10 @@ contract Pool is PoolStorage {
         return isCollateral(account) ? accountDepositAmount(account) : 0;
     }
 
+    /**
+     * @notice the USD value of the collateral
+     * @param account - the account for which to return the collateral value
+     */
     function accountCollateralValue(address account)
         public
         view
@@ -304,7 +343,7 @@ contract Pool is PoolStorage {
     }
 
     function accountDebtValue(address account) public view returns (uint256) {
-        return (accountDebtAmount(account) * underlyingPrice()) / one();
+        return (accountDebtAmount(account) * underlyingPrice()) / 1 ether;
     }
 
     function accountDepositValue(address account)
@@ -312,15 +351,15 @@ contract Pool is PoolStorage {
         view
         returns (uint256)
     {
-        return (accountDepositAmount(account) * underlyingPrice()) / one();
+        return (accountDepositAmount(account) * underlyingPrice()) / 1 ether;
     }
 
     function accountMaxDebtValue(address account, bool isLiquidating)
         public
         view
-        returns (uint256 price)
+        returns (uint256 max)
     {
-        price = 0;
+        max = 0;
         if (isCollateral(account)) {
             uint256 multiplier = _lendingConfig.collateralFactor;
             if (isLiquidating) {
@@ -331,10 +370,11 @@ contract Pool is PoolStorage {
                 );
             }
             uint256 amount = accountCollateralValue(account) * multiplier;
-            price = amount / one();
+            max = amount / 1 ether;
         }
     }
 
+    /** ENTRYPOINT ONLY METHODS **************/
     function setCollateral(address account, bool config)
         public
         onlyRole(DELEGATOR_ROLE)
@@ -374,32 +414,53 @@ contract Pool is PoolStorage {
         return _repay(account, amount, account);
     }
 
+    /**
+     * @notice Increase borrow allowance of other address
+     * @dev required for collateral and deposit swaps
+     * @param account - the account granting allowance
+     * @param beneficiary - the beneficiary of the allowance
+     * @param amount - the amount to increase the allowance by
+     */
     function increaseBorrowAllowance(
         address account,
         address beneficiary,
         uint256 amount
     ) public onlyRole(DELEGATOR_ROLE) {
         uint256 current = _borrowAllowances[account][beneficiary];
-        uint256 maxIncrease = (2**256 - 1) - current;
+        uint256 maxIncrease = type(uint256).max - current;
         if (amount > maxIncrease) {
             amount = maxIncrease;
         }
         _borrowAllowances[account][beneficiary] += amount;
     }
 
+    /**
+     * @notice Increase withdrawal allowance of other address
+     * @dev required for collateral and deposit swaps
+     * @param account - the account granting allowance
+     * @param beneficiary - the beneficiary of the allowance
+     * @param amount - the amount to increase the allowance by
+     */
     function increaseWithdrawAllowance(
         address account,
         address beneficiary,
         uint256 amount
     ) public onlyRole(DELEGATOR_ROLE) {
         uint256 current = _withdrawAllowances[account][beneficiary];
-        uint256 maxIncrease = (2**256 - 1) - current;
+        uint256 maxIncrease = type(uint256).max - current;
         if (amount > maxIncrease) {
             amount = maxIncrease;
         }
         _withdrawAllowances[account][beneficiary] += amount;
     }
 
+    /**
+     * @notice allows to deposit on behalf of another account
+     * @dev requires underlying allowance to be set prior to calling this
+     * @param beneficiary - the account for which the deposit is being made for
+     * @param amount - the amount to deposit
+     * @param depositor - the origin of the funds
+     */
     function depositBehalf(
         address beneficiary,
         uint256 amount,
@@ -408,6 +469,13 @@ contract Pool is PoolStorage {
         return _deposit(beneficiary, amount, depositor);
     }
 
+    /**
+     * @notice allows to deposit on behalf of another account
+     * @dev requires borrow allowance to be set prior to calling this
+     * @param account - the account for which the loan is being opened for
+     * @param amount - the amount to borrow
+     * @param initiator - the account triggering such action
+     */
     function borrowBehalf(
         address account,
         uint256 amount,
@@ -418,6 +486,13 @@ contract Pool is PoolStorage {
         return _borrow(account, amount);
     }
 
+    /**
+     * @notice allows to withdraw on behalf of another account
+     * @dev requires withdraw allowance to be set prior to calling this
+     * @param account - the account for which the withdrawal is being made for
+     * @param amount - the amount to withdraw
+     * @param recipient - the recipient of funds and initiator of the withdrawal
+     */
     function withdrawBehalf(
         address account,
         uint256 amount,
@@ -428,6 +503,13 @@ contract Pool is PoolStorage {
         return _withdraw(account, amount, recipient);
     }
 
+    /**
+     * @notice allows to repay on behalf of another account
+     * @dev requires underlying allowance to be set prior to calling this
+     * @param beneficiary - the account for which the deposit is being made for
+     * @param amount - the amount to deposit
+     * @param repayer - the origin of the funds
+     */
     function repayBehalf(
         address beneficiary,
         uint256 amount,
@@ -436,7 +518,7 @@ contract Pool is PoolStorage {
         return _repay(beneficiary, amount, repayer);
     }
 
-    /** FLASH LOAN***************** */
+    /** FLASH LOAN METHODS ***************** */
     function maxFlashLoan() public view returns (uint256) {
         return _flashLoanConfig.active ? getCash() : 0;
     }
@@ -446,8 +528,8 @@ contract Pool is PoolStorage {
         view
         returns (uint256)
     {
-        uint256 baseFee = ((amount * (1 ether + _flashLoanConfig.fee)) /
-            1 ether) - amount;
+        require(amount >= 1 ether / _flashLoanConfig.fee);
+        uint256 baseFee = (amount * _flashLoanConfig.fee) / 1 ether;
         return _perksAggregator.calculateFee(account, baseFee);
     }
 
@@ -463,7 +545,6 @@ contract Pool is PoolStorage {
         uint256 fee = flashFee(account, amount);
         _underlying.safeTransfer(address(receiver), amount);
 
-        console.log("underlying=%s", address(_underlying));
         require(
             receiver.onFlashLoan(
                 _msgSender(),
@@ -472,7 +553,7 @@ contract Pool is PoolStorage {
                 fee,
                 data
             ) == keccak256("ERC3156FlashBorrower.onFlashLoan"),
-            "FlashLender: Callback failed"
+            "Pool: flashloan callback failed"
         );
         _underlying.safeTransferFrom(
             address(receiver),

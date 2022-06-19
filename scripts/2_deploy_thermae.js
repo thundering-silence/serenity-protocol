@@ -29,12 +29,12 @@ async function main() {
         throw Error('No BODY or TREASURY address set in .env!')
     }
     const Thermae = await ethers.getContractFactory("Thermae");
-    const SOUL = await Thermae.deploy(env.BODY, env.TREASURY, constants.WeiPerEther)
+    const SOUL = await Thermae.deploy(env.BODY, env.TREASURY)
     await SOUL.deployed()
 
-    await Promise.all(tiersData.map(async (t, i) => {
-        await SOUL.functions.updateTierConfig(i, Object.values(t))
-    }))
+    // await Promise.all(tiersData.map(async (t, i) => {
+    //     await SOUL.functions.updateTierConfig(i, Object.values(t))
+    // }))
 
     const ZenGarden = await ethers.getContractFactory("ZenGarden");
     const zenGarden = await ZenGarden.attach(env.BODY)

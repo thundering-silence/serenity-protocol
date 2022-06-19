@@ -23,9 +23,6 @@ import "../libraries/DataTypesLib.sol";
 contract Thermae is ERC20("Soul", "SOUL"), Ownable {
     using SafeERC20 for IZenGarden;
 
-    uint256 public immutable SECOND_TO_BODY = 50;
-    uint256 public immutable MIND_TO_BODY = 10;
-
     IZenGarden internal _zenGarden;
     address internal _treasury;
 
@@ -40,12 +37,50 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
     event UpdateTreasury(address value);
     event UpdateMinLockAmount(uint256 value);
 
-    constructor(
-        IZenGarden zenGarden_,
-        address treasury_
-    ) {
+    constructor(IZenGarden zenGarden_, address treasury_) {
         _zenGarden = zenGarden_;
         _treasury = treasury_;
+    }
+
+    function _getMultiplier(uint256 lockPeriod)
+        internal
+        pure
+        returns (uint256 multiplier)
+    {
+        (
+            uint256[] memory periods,
+            uint256[] memory multipliers
+        ) = lockMulitpliers();
+        multiplier;
+        for (uint256 i = 3; i >= 0; --i) {
+            if (lockPeriod >= periods[i]) {
+                multiplier = multipliers[i];
+                break;
+            }
+        }
+    }
+
+    function lockMulitpliers()
+        public
+        pure
+        returns (uint256[] memory, uint256[] memory)
+    {
+        uint256[] memory lockPeriods = new uint256[](4);
+        uint256[] memory multipliers = new uint256[](4);
+
+        lockPeriods[0] = 90 days;
+        multipliers[0] = 1;
+
+        lockPeriods[1] = 365 days;
+        multipliers[1] = 10;
+
+        lockPeriods[2] = 2 * 365 days;
+        multipliers[2] = 25;
+
+        lockPeriods[3] = 4 * 365 days;
+        multipliers[3] = 100;
+
+        return (lockPeriods, multipliers);
     }
 
     function zenGarden() public view returns (IZenGarden) {
@@ -72,15 +107,13 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
     function join(uint256 amount, uint256 lockPeriod) public {
         DataTypes.MemberData storage data = _members[_msgSender()];
         require(data.depositedAmount == 0, "Thermae: Already joined");
+        require(lockPeriod >= 90 days, "Thermae: lock period too small");
         data.unlockTime = block.timestamp + lockPeriod;
         data.depositedAmount = amount;
 
         _zenGarden.safeTransferFrom(_msgSender(), address(this), amount);
 
-        _mint(
-            _msgSender(),
-            (amount * SECOND_TO_BODY * lockPeriod) / MIND_TO_BODY
-        );
+        _mint(_msgSender(), (amount * _getMultiplier(lockPeriod) * lockPeriod));
 
         emit Join(_msgSender(), amount);
     }
@@ -98,8 +131,8 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
         uint256 lockPeriod = newUnlockTime - block.timestamp;
 
         uint256 expectedAmount = (data.depositedAmount *
-            SECOND_TO_BODY *
-            lockPeriod) / MIND_TO_BODY;
+            _getMultiplier(lockPeriod) *
+            lockPeriod);
 
         uint256 amountToMint = expectedAmount - balanceOf(_msgSender());
         data.unlockTime = newUnlockTime;
@@ -120,9 +153,15 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
         uint256 newDepositedAmount = data.depositedAmount + amount;
         uint256 lockPeriod = data.unlockTime - block.timestamp;
 
+        // if remaining lock is less than allowed prolong to minimum allowed
+        if (lockPeriod < 90 days) {
+            lockPeriod = 90 days;
+            data.unlockTime = block.timestamp + lockPeriod;
+        }
+
         uint256 expectedAmount = (data.depositedAmount *
-            SECOND_TO_BODY *
-            lockPeriod) / MIND_TO_BODY;
+            _getMultiplier(lockPeriod) *
+            lockPeriod);
 
         uint256 amountToMint = expectedAmount - balanceOf(_msgSender());
         data.depositedAmount = newDepositedAmount;
@@ -191,7 +230,6 @@ contract Thermae is ERC20("Soul", "SOUL"), Ownable {
 
         emit Withdraw(_msgSender(), amountWithdrawn);
     }
-
 
     // ADMIN METHOD
     function updateZenGarden(address value) public onlyOwner {
